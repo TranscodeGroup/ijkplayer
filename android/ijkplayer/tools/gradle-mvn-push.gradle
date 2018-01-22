@@ -42,6 +42,17 @@ def getRepositoryPassword() {
 afterEvaluate { project ->
     uploadArchives {
         repositories {
+            if (!getRepositoryPassword()) { // 若未设置密码, 则发布到本地仓库
+                mavenDeployer {
+                    pom.groupId = 'cn.transcodegroup.ijkplayer'
+                    pom.artifactId = POM_ARTIFACT_ID
+                    pom.version = "$VERSION_NAME.6"
+                    repository(url: mavenLocal().url) {
+
+                    }
+                }
+                return
+            }
             mavenDeployer {
                 beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
 
