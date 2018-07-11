@@ -47,6 +47,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
+import java.nio.ByteBuffer;
 import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.Locale;
@@ -1135,6 +1136,18 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
          * @throws Exception on any error
          */
         boolean onNativeInvoke(int what, Bundle args);
+    }
+
+    @CalledByNative
+    private static void onFrame(Object weakThiz, ByteBuffer buffer, double pts, int format) {
+        IjkMediaPlayer thiz = ((WeakReference<IjkMediaPlayer>) weakThiz).get();
+        if (thiz != null) {
+            thiz.onFrame(buffer, pts, format);
+        }
+    }
+
+    private void onFrame(ByteBuffer buffer, double pts, int format) {
+        DebugLog.ifmt(TAG + "-tgtrack", "onFrame: %s, %s, %s", buffer, pts, format);
     }
 
     @CalledByNative

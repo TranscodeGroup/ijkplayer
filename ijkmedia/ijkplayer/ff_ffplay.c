@@ -73,6 +73,11 @@
 #include "ijkmeta.h"
 #include "ijkversion.h"
 #include <stdatomic.h>
+#include <jni.h>
+#include "ijksdl/android/ijksdl_android_jni.h"
+#include "android/ijkplayer_jni.h"
+#include "ijkj4a/j4au/class/java/nio/ByteBuffer.util.h"
+
 #if defined(__ANDROID__)
 #include "ijksoundtouch/ijksoundtouch_wrap.h"
 #endif
@@ -1477,6 +1482,8 @@ static void alloc_picture(FFPlayer *ffp, int frame_format)
     SDL_UnlockMutex(is->pictq.mutex);
 }
 
+static bool send_frame_to_java(FFPlayer *ffp, Frame *vp);
+
 static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double duration, int64_t pos, int serial)
 {
     VideoState *is = ffp->is;
@@ -1622,6 +1629,7 @@ static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double d
 #ifdef FFP_MERGE
         av_frame_move_ref(vp->frame, src_frame);
 #endif
+        send_frame_to_java(ffp, vp);
         frame_queue_push(&is->pictq);
         if (!is->viddec.first_frame_decoded) {
             ALOGD("Video: first frame decoded\n");
@@ -1630,6 +1638,37 @@ static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double d
             is->viddec.first_frame_decoded = 1;
         }
     }
+    return 0;
+}
+static jobject g_pixel_buffer;
+static bool send_frame_to_java(FFPlayer *ffp, Frame *vp)
+{
+    TGLOGI("send_frame_to_java");
+    JNIEnv *env = NULL;
+    if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
+        ALOGE("%s: SetupThreadEnv failed\n", __func__);
+        return -1;
+    }
+    SDL_VoutOverlay *bmp = vp->bmp;
+    jint size = 0;
+    for (int i = 0; i < bmp->planes; i++) {
+        size += bmp->pitches[i];
+    }
+    TGLOGI("planes=%d, size=%d", bmp->planes, size);
+    if (!g_pixel_buffer) {
+        g_pixel_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, size);
+        if (!g_pixel_buffer) {
+            J4A_FUNC_FAIL_TRACE();
+            return -1;
+        }
+    }
+    int ret = -1;
+    ret = J4AC_ByteBuffer__assignData__catchAll(env, g_pixel_buffer, bmp->pixels, size);
+    if (ret < 0) {
+        J4A_FUNC_FAIL_TRACE();
+        return -1;
+    }
+    IjkMediaPlayer_onFrame__catchAll(env, ffp->inject_opaque, g_pixel_buffer, vp->pts, vp->format);
     return 0;
 }
 

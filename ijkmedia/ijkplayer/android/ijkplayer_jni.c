@@ -21,6 +21,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include "ijkplayer_jni.h"
 #include <assert.h>
 #include <string.h>
 #include <pthread.h>
@@ -54,6 +55,7 @@ static JavaVM* g_jvm;
 typedef struct player_fields_t {
     pthread_mutex_t mutex;
     jclass clazz;
+    jmethodID method_onFrame;
 } player_fields_t;
 static player_fields_t g_clazz;
 
@@ -1184,6 +1186,11 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved)
     IJK_FIND_JAVA_CLASS(env, g_clazz.clazz, JNI_CLASS_IJKPLAYER);
     (*env)->RegisterNatives(env, g_clazz.clazz, g_methods, NELEM(g_methods) );
 
+    g_clazz.method_onFrame = J4A_GetStaticMethodID__catchAll(env, g_clazz.clazz, "onFrame", "(Ljava/lang/Object;Ljava/nio/ByteBuffer;DI)V");
+    if (g_clazz.method_onFrame == NULL) {
+        J4A_ThrowIllegalStateException(env, "find IjkMediaPlayer.onFrame() failed!");
+    }
+
     ijkmp_global_init();
     ijkmp_global_set_inject_callback(inject_callback);
 
@@ -1197,4 +1204,12 @@ JNIEXPORT void JNI_OnUnload(JavaVM *jvm, void *reserved)
     ijkmp_global_uninit();
 
     pthread_mutex_destroy(&g_clazz.mutex);
+}
+
+void IjkMediaPlayer_onFrame__catchAll(JNIEnv *env, jobject weakThiz, jobject buffer, jdouble pts,
+                                      jint format)
+{
+    (*env)->CallStaticVoidMethod(env, g_clazz.clazz, g_clazz.method_onFrame, weakThiz,
+                                 buffer, pts, format);
+    J4A_ExceptionCheck__catchAll(env);
 }
