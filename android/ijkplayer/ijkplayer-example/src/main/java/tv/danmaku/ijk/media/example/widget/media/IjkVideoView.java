@@ -63,7 +63,8 @@ import tv.danmaku.ijk.media.example.application.Settings;
 import tv.danmaku.ijk.media.example.services.MediaPlayerService;
 
 public class IjkVideoView extends FrameLayout implements MediaController.MediaPlayerControl {
-    private String TAG = "IjkVideoView";
+    private static String TAG = "IjkVideoView";
+    private static String TAG_TG = TAG + "-tgtrack";
     // settable by the client
     private Uri mUri;
     private Map<String, String> mHeaders;
@@ -1257,5 +1258,13 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
 
     public int getSelectedTrack(int trackType) {
         return MediaPlayerCompat.getSelectedTrack(mMediaPlayer, trackType);
+    }
+
+    public void setOnFrameAvailableListener(IjkMediaPlayer.OnFrameAvailableListener listener){
+        if (mMediaPlayer instanceof IjkMediaPlayer) {
+            ((IjkMediaPlayer) mMediaPlayer).setOnFrameAvailableListener(listener);
+        } else {
+            Log.w(TAG_TG, "mMediaPlayer isn't IjkMediaPlayer, nonsupport setOnFrameAvailableListener");
+        }
     }
 }

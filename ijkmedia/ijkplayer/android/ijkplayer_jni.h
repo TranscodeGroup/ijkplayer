@@ -7,8 +7,9 @@
 
 #include <jni.h>
 
-void IjkMediaPlayer_onFrame__catchAll(JNIEnv *env, jobject weakThiz,
+void IjkMediaPlayer_onVideoFrame__catchAll(JNIEnv *env, jobject weakThiz,
                                       jobject buffer, jdouble pts, jint format);
-
+void IjkMediaPlayer_onAudioFrame__catchAll(JNIEnv *env, jobject weakThiz,
+                                      jobject buffer, jdouble pts);
 
 #endif //IJKPLAYER_IJKPLAYER_JNI_H
