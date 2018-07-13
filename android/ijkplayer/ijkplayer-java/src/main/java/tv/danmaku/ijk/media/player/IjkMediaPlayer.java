@@ -68,6 +68,7 @@ import tv.danmaku.ijk.media.player.pragma.DebugLog;
  */
 public final class IjkMediaPlayer extends AbstractMediaPlayer {
     private final static String TAG = IjkMediaPlayer.class.getName();
+    private final static String TAG_TG = TAG + "-tgtrack";
 
     private static final int MEDIA_NOP = 0; // interface test message
     private static final int MEDIA_PREPARED = 1;
@@ -1094,6 +1095,37 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     public interface OnControlMessageListener {
         String onControlResolveSegmentUrl(int segment);
     }
+    private OnFrameAvailableListener mOnFrameAvailableListener;
+
+    public void setOnFrameAvailableListener(OnFrameAvailableListener listener) {
+        mOnFrameAvailableListener = listener;
+    }
+
+    public interface OnFrameAvailableListener{
+        void onVideoFrame(ByteBuffer buffer, double pts, int format);
+        void onAudioFrame(ByteBuffer buffer, double pts);
+    }
+
+    @CalledByNative
+    private static void onVideoFrame(Object weakThiz, ByteBuffer buffer, double pts, int format){
+        IjkMediaPlayer thiz = ((WeakReference<IjkMediaPlayer>) weakThiz).get();
+        if (thiz != null) {
+            DebugLog.ifmt(TAG_TG, "onVideoFrame: %s, %s, %s", buffer, pts, format);
+            if (thiz.mOnFrameAvailableListener != null) {
+                thiz.mOnFrameAvailableListener.onVideoFrame(buffer, pts, format);
+            }
+        }
+    }
+    @CalledByNative
+    private static  void onAudioFrame(Object weakThiz,ByteBuffer buffer, double pts){
+       IjkMediaPlayer thiz = ((WeakReference<IjkMediaPlayer>) weakThiz).get();
+       if (thiz != null) {
+           DebugLog.ifmt(TAG_TG, "onAudioFrame: %s, %s", buffer, pts);
+           if (thiz.mOnFrameAvailableListener != null) {
+               thiz.mOnFrameAvailableListener.onAudioFrame(buffer, pts);
+           }
+       }
+   }
 
     /*
      * NativeInvoke
@@ -1136,18 +1168,6 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
          * @throws Exception on any error
          */
         boolean onNativeInvoke(int what, Bundle args);
-    }
-
-    @CalledByNative
-    private static void onFrame(Object weakThiz, ByteBuffer buffer, double pts, int format) {
-        IjkMediaPlayer thiz = ((WeakReference<IjkMediaPlayer>) weakThiz).get();
-        if (thiz != null) {
-            thiz.onFrame(buffer, pts, format);
-        }
-    }
-
-    private void onFrame(ByteBuffer buffer, double pts, int format) {
-        DebugLog.ifmt(TAG + "-tgtrack", "onFrame: %s, %s, %s", buffer, pts, format);
     }
 
     @CalledByNative

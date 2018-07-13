@@ -55,7 +55,8 @@ static JavaVM* g_jvm;
 typedef struct player_fields_t {
     pthread_mutex_t mutex;
     jclass clazz;
-    jmethodID method_onFrame;
+    jmethodID method_onVideoFrame;
+    jmethodID method_onAudioFrame;
 } player_fields_t;
 static player_fields_t g_clazz;
 
@@ -1186,9 +1187,13 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved)
     IJK_FIND_JAVA_CLASS(env, g_clazz.clazz, JNI_CLASS_IJKPLAYER);
     (*env)->RegisterNatives(env, g_clazz.clazz, g_methods, NELEM(g_methods) );
 
-    g_clazz.method_onFrame = J4A_GetStaticMethodID__catchAll(env, g_clazz.clazz, "onFrame", "(Ljava/lang/Object;Ljava/nio/ByteBuffer;DI)V");
-    if (g_clazz.method_onFrame == NULL) {
-        J4A_ThrowIllegalStateException(env, "find IjkMediaPlayer.onFrame() failed!");
+    g_clazz.method_onVideoFrame = J4A_GetStaticMethodID__catchAll(env, g_clazz.clazz, "onVideoFrame", "(Ljava/lang/Object;Ljava/nio/ByteBuffer;DI)V");
+    if (g_clazz.method_onVideoFrame == NULL) {
+        J4A_ThrowIllegalStateException(env, "find IjkMediaPlayer>onVideoFrame() failed!");
+    }
+    g_clazz.method_onAudioFrame = J4A_GetStaticMethodID__catchAll(env, g_clazz.clazz, "onAudioFrame", "(Ljava/lang/Object;Ljava/nio/ByteBuffer;D)V");
+    if (g_clazz.method_onAudioFrame == NULL) {
+        J4A_ThrowIllegalStateException(env, "find IjkMediaPlayer>onAudioFrame() failed!");
     }
 
     ijkmp_global_init();
@@ -1206,10 +1211,16 @@ JNIEXPORT void JNI_OnUnload(JavaVM *jvm, void *reserved)
     pthread_mutex_destroy(&g_clazz.mutex);
 }
 
-void IjkMediaPlayer_onFrame__catchAll(JNIEnv *env, jobject weakThiz, jobject buffer, jdouble pts,
+void IjkMediaPlayer_onVideoFrame__catchAll(JNIEnv *env, jobject weakThiz, jobject buffer, jdouble pts,
                                       jint format)
 {
-    (*env)->CallStaticVoidMethod(env, g_clazz.clazz, g_clazz.method_onFrame, weakThiz,
+    (*env)->CallStaticVoidMethod(env, g_clazz.clazz, g_clazz.method_onVideoFrame, weakThiz,
                                  buffer, pts, format);
+    J4A_ExceptionCheck__catchAll(env);
+}
+void IjkMediaPlayer_onAudioFrame__catchAll(JNIEnv *env, jobject weakThiz, jobject buffer, jdouble pts)
+{
+    (*env)->CallStaticVoidMethod(env, g_clazz.clazz, g_clazz.method_onAudioFrame, weakThiz, buffer,
+                                 pts);
     J4A_ExceptionCheck__catchAll(env);
 }
