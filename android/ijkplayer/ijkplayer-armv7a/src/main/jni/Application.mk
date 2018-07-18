@@ -17,7 +17,7 @@
 # License along with ijkPlayer; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
-APP_OPTIM := release
+APP_OPTIM := debug
 APP_PLATFORM := android-9
 APP_ABI := armeabi-v7a
 NDK_TOOLCHAIN_VERSION=4.9
@@ -25,7 +25,7 @@ APP_PIE := false
 
 APP_STL := stlport_static
 
-APP_CFLAGS := -O3 -Wall -pipe \
+APP_CFLAGS := -O0 -Wall -pipe \
     -ffast-math \
     -fstrict-aliasing -Werror=strict-aliasing \
     -Wno-psabi -Wa,--noexecstack \
