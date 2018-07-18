@@ -65,6 +65,7 @@
 #include "ff_ffmsg_queue.h"
 #include "ff_ffpipenode.h"
 #include "ijkmeta.h"
+#include <jni.h>
 
 #define DEFAULT_HIGH_WATER_MARK_IN_BYTES        (256 * 1024)
 
@@ -710,6 +711,7 @@ typedef struct FFPlayer {
     int skip_calc_frame_rate;
     int get_frame_mode;
     GetImgInfo *get_img_info;
+    jobject pixel_buffer;
 } FFPlayer;
 
 #define fftime_to_milliseconds(ts) (av_rescale(ts, 1000, AV_TIME_BASE))
@@ -770,6 +772,7 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     ffp->vout                   = NULL; /* reset outside */
     ffp->pipeline               = NULL;
     ffp->node_vdec              = NULL;
+    ffp->pixel_buffer           = NULL; /* reset outside */
     ffp->sar_num                = 0;
     ffp->sar_den                = 0;
 

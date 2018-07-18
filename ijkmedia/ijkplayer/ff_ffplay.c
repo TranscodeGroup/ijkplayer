@@ -1482,7 +1482,189 @@ static void alloc_picture(FFPlayer *ffp, int frame_format)
     SDL_UnlockMutex(is->pictq.mutex);
 }
 
-static bool send_frame_to_java(FFPlayer *ffp, Frame *vp);
+static int send_frame_to_java2(FFPlayer *ffp, Frame *vp, AVFrame *frame)
+{
+    // TGLOGI("send_frame_to_java");
+    if (frame->format != AV_PIX_FMT_YUV420P) {
+        TGLOGW("unsupported frame format %d", frame->format);
+        return -1;
+    }
+    JNIEnv *env = NULL;
+    if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
+        ALOGE("%s: SetupThreadEnv failed\n", __func__);
+        return -1;
+    }
+    jint total_size = 0;
+    int planes = 0;
+    int line_width[] = {frame->width, frame->width / 2, frame->width / 2}; // for yuv420p
+    int line_height[] = {frame->height, frame->height / 2, frame->height / 2}; // for yuv420p
+    for (int i = 0; i < AV_NUM_DATA_POINTERS; i++) {
+        int size = frame->linesize[i] * line_height[i];
+        if (size <= 0) {
+            break;
+        }
+        total_size += size;
+        planes++;
+    }
+    if (!ffp->pixel_buffer) {
+        TGLOGI("planes=%d, total_size=%d, format=%d, width=%d, height=%d", planes, total_size,
+               frame->format, frame->width, frame->height);
+        ffp->pixel_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, total_size);
+        if (!ffp->pixel_buffer) {
+            J4A_FUNC_FAIL_TRACE();
+            return -1;
+        }
+    }
+    // copy pixels to buffer
+    // see: J4AC_ByteBuffer__assignData__catchAll
+    jobject tmp_buffer = J4AC_ByteBuffer__limit(env, ffp->pixel_buffer, total_size);
+    if (J4A_ExceptionCheck__catchAll(env) || !tmp_buffer) {
+        TGLOGW("exec pixel_buffer.limit(%d) failed. maybe size changed.", total_size);
+        return -1;
+    }
+    J4A_DeleteLocalRef__p(env, &tmp_buffer);
+    uint8_t *c_buffer = J4AC_ByteBuffer__getDirectBufferAddress__catchAll(env, ffp->pixel_buffer);
+    if (!c_buffer) {
+        return -1;
+    }
+    int offset = 0;
+    for (int i = 0; i < planes; i++) {
+        size_t size = (size_t) frame->linesize[i] * line_height[i];
+        memcpy(c_buffer + offset, frame->data[i], size);
+        offset += size;
+    }
+    // vp->format and frame->format is frame format, vp->bmp->format is display format, them is diff!
+    // vp->pts is double type, frame->pts is int64_t type, in here, we need double type.
+    IjkMediaPlayer_onVideoFrame__catchAll(env, ffp->inject_opaque, ffp->pixel_buffer, vp->pts,
+                                          frame->format, frame->width, frame->height);
+    return 0;
+}
+
+char *ijk_array_to_hex(uint8_t *arr, int size) {
+    int linesize = 50;
+    char *str = (char *) malloc(sizeof(char) * ((2 * size)/* %02X */ + (1)/* \0 */ + (size / linesize + 1)/* \n */));
+    char *str_p = str;
+    for (int i = 0; i < size; i++) {
+        if (i % linesize == 0) {
+            str_p += sprintf(str_p, "\n");
+        }
+        str_p += sprintf(str_p, "%02X", arr[i]);
+    }
+    return str;
+}
+
+static jobject g_pixel_buffer;
+static bool send_frame_to_java(FFPlayer *ffp, Frame *vp)
+{
+    // TGLOGI("send_frame_to_java");
+    JNIEnv *env = NULL;
+    if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
+        ALOGE("%s: SetupThreadEnv failed\n", __func__);
+        return -1;
+    }
+    SDL_VoutOverlay *bmp = vp->bmp;
+    jint total_size = 0;
+    for (int i = 0; i < bmp->planes; i++) {
+        total_size += bmp->pitches[i];
+    }
+    if (!g_pixel_buffer) {
+        TGLOGI("planes=%d, total_size=%d, format=%d, width=%d, height=%d", bmp->planes, total_size,
+               bmp->format, bmp->w, bmp->h);
+        g_pixel_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, total_size);
+        if (!g_pixel_buffer) {
+            J4A_FUNC_FAIL_TRACE();
+            return -1;
+        }
+    }
+    // copy pixels to buffer
+    // see: J4AC_ByteBuffer__assignData__catchAll
+    jobject tmp_buffer = J4AC_ByteBuffer__limit(env, g_pixel_buffer, total_size);
+    if (J4A_ExceptionCheck__catchAll(env) || !tmp_buffer) {
+        return -1;
+    }
+    J4A_DeleteLocalRef__p(env, &tmp_buffer);
+    uint8_t *c_buffer = J4AC_ByteBuffer__getDirectBufferAddress__catchAll(env, g_pixel_buffer);
+    if (!c_buffer) {
+        return -1;
+    }
+    int offset = 0;
+    for (int i = 0; i < bmp->planes; i++) {
+        Uint16 size = bmp->pitches[i];
+        memcpy(c_buffer + offset, bmp->pixels[i], size);
+        offset += size;
+    }
+
+    // vp->format is frame format, vp->bmp->format is display format, them is diff!
+    IjkMediaPlayer_onVideoFrame__catchAll(env, ffp->inject_opaque, g_pixel_buffer, vp->pts,
+                                          bmp->format, bmp->w, bmp->h);
+    return 0;
+}
+
+static int send_frame_to_java3(FFPlayer *ffp, Frame *vp, AVFrame *frame)
+{
+    // TGLOGI("send_frame_to_java");
+    if (frame->format != AV_PIX_FMT_YUV420P) {
+        TGLOGW("unsupported frame format %d", frame->format);
+        return -1;
+    }
+    JNIEnv *env = NULL;
+    if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
+        ALOGE("%s: SetupThreadEnv failed\n", __func__);
+        return -1;
+    }
+    jint total_size = 0;
+    int planes = 0;
+    int line_width[] = {frame->width, frame->width / 2, frame->width / 2}; // for yuv420p
+    int line_height[] = {frame->height, frame->height / 2, frame->height / 2}; // for yuv420p
+    for (int i = 0; i < AV_NUM_DATA_POINTERS; i++) {
+        int size = frame->linesize[i] * line_height[i];
+        if (size <= 0) {
+            break;
+        }
+        total_size += size;
+        planes++;
+    }
+    if (!ffp->pixel_buffer) {
+        TGLOGI("planes=%d, total_size=%d, format=%d, width=%d, height=%d", planes, total_size,
+               frame->format, frame->width, frame->height);
+        ffp->pixel_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, total_size);
+        if (!ffp->pixel_buffer) {
+            J4A_FUNC_FAIL_TRACE();
+            return -1;
+        }
+    }
+    // copy pixels to buffer
+    // see: J4AC_ByteBuffer__assignData__catchAll
+    int buffer_size = 0;
+    for (int i = 0; i < planes; i++) {
+        buffer_size += line_width[i] * line_height[i];
+    }
+    jobject tmp_buffer = J4AC_ByteBuffer__limit(env, ffp->pixel_buffer, buffer_size);
+    if (J4A_ExceptionCheck__catchAll(env) || !tmp_buffer) {
+        TGLOGW("exec pixel_buffer.limit(%d) failed. maybe size changed.", buffer_size);
+        return -1;
+    }
+    J4A_DeleteLocalRef__p(env, &tmp_buffer);
+    uint8_t *c_buffer = J4AC_ByteBuffer__getDirectBufferAddress__catchAll(env, ffp->pixel_buffer);
+    if (!c_buffer) {
+        return -1;
+    }
+    int buffer_offset = 0, line_offset = 0;
+    for (int i = 0; i < planes; i++) {
+        line_offset = 0;
+        for (int j = 0; j < line_height[i]; j++) {
+            memcpy(c_buffer + buffer_offset, frame->data[i] + line_offset, (size_t) line_width[i]);
+            line_offset += frame->linesize[i];
+            buffer_offset += line_width[i];
+        }
+    }
+    // vp->format and frame->format is frame format, vp->bmp->format is display format, them is diff!
+    // vp->pts is double type, frame->pts is int64_t type, in here, we need double type.
+    IjkMediaPlayer_onVideoFrame__catchAll(env, ffp->inject_opaque, ffp->pixel_buffer, vp->pts,
+                                          frame->format, frame->width, frame->height);
+    return 0;
+}
+
 
 static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double duration, int64_t pos, int serial)
 {
@@ -1629,7 +1811,9 @@ static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double d
 #ifdef FFP_MERGE
         av_frame_move_ref(vp->frame, src_frame);
 #endif
-        send_frame_to_java(ffp, vp);
+        // send_frame_to_java(ffp, vp);
+        // send_frame_to_java2(ffp, vp, src_frame);
+        send_frame_to_java3(ffp, vp, src_frame);
         frame_queue_push(&is->pictq);
         if (!is->viddec.first_frame_decoded) {
             ALOGD("Video: first frame decoded\n");
@@ -1638,50 +1822,6 @@ static int queue_picture(FFPlayer *ffp, AVFrame *src_frame, double pts, double d
             is->viddec.first_frame_decoded = 1;
         }
     }
-    return 0;
-}
-static jobject g_pixel_buffer;
-static bool send_frame_to_java(FFPlayer *ffp, Frame *vp)
-{
-    TGLOGI("send_frame_to_java");
-    JNIEnv *env = NULL;
-    if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
-        ALOGE("%s: SetupThreadEnv failed\n", __func__);
-        return -1;
-    }
-    SDL_VoutOverlay *bmp = vp->bmp;
-    jint total_size = 0;
-    for (int i = 0; i < bmp->planes; i++) {
-        total_size += bmp->pitches[i];
-    }
-    TGLOGI("planes=%d, total_size=%d", bmp->planes, total_size);
-    if (!g_pixel_buffer) {
-        g_pixel_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, total_size);
-        if (!g_pixel_buffer) {
-            J4A_FUNC_FAIL_TRACE();
-            return -1;
-        }
-    }
-    // copy pixels to buffer
-    // see: J4AC_ByteBuffer__assignData__catchAll
-    jobject tmp_buffer = J4AC_ByteBuffer__limit(env, g_pixel_buffer, total_size);
-    if (J4A_ExceptionCheck__catchAll(env) || !tmp_buffer) {
-        return -1;
-    }
-    J4A_DeleteLocalRef__p(env, &tmp_buffer);
-    uint8_t *c_buffer = J4AC_ByteBuffer__getDirectBufferAddress__catchAll(env, g_pixel_buffer);
-    if (!c_buffer) {
-        return -1;
-    }
-    int offset = 0;
-    for (int i = 0; i < bmp->planes; i++) {
-        Uint16 size = bmp->pitches[i];
-        memcpy(c_buffer + offset, bmp->pixels[i], size);
-        offset += size;
-    }
-
-    // vp->format is frame format, vp->bmp->format is display format, them is diff!
-    IjkMediaPlayer_onVideoFrame__catchAll(env, ffp->inject_opaque, g_pixel_buffer, vp->pts, vp->bmp->format);
     return 0;
 }
 
@@ -3924,6 +4064,19 @@ FFPlayer *ffp_create()
     return ffp;
 }
 
+static void ffpixel_buffer_free_p(jobject *pixel_buffer)
+{
+    if (!pixel_buffer) {
+        return;
+    }
+    JNIEnv *env = NULL;
+    if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
+        ALOGE("%s: SetupThreadEnv failed\n", __func__);
+        return;
+    }
+    J4A_DeleteGlobalRef__p(env, pixel_buffer);
+}
+
 void ffp_destroy(FFPlayer *ffp)
 {
     if (!ffp)
@@ -3940,6 +4093,7 @@ void ffp_destroy(FFPlayer *ffp)
     ffpipenode_free_p(&ffp->node_vdec);
     ffpipeline_free_p(&ffp->pipeline);
     ijkmeta_destroy_p(&ffp->meta);
+    ffpixel_buffer_free_p(&ffp->pixel_buffer);
     ffp_reset_internal(ffp);
 
     SDL_DestroyMutexP(&ffp->af_mutex);

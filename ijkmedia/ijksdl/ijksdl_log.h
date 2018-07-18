@@ -85,5 +85,6 @@
 #define ALOGE(...)  ALOG(IJK_LOG_ERROR,     IJK_LOG_TAG, __VA_ARGS__)
 #define LOG_ALWAYS_FATAL(...)   do { ALOGE(__VA_ARGS__); exit(1); } while (0)
 #define TGLOGI(...) ALOG(IJK_LOG_INFO, IJK_LOG_TAG_TG, __VA_ARGS__)
+#define TGLOGW(...) ALOG(IJK_LOG_WARN, IJK_LOG_TAG_TG, __VA_ARGS__)
 
 #endif
