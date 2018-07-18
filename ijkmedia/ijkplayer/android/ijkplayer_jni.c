@@ -1187,7 +1187,7 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *reserved)
     IJK_FIND_JAVA_CLASS(env, g_clazz.clazz, JNI_CLASS_IJKPLAYER);
     (*env)->RegisterNatives(env, g_clazz.clazz, g_methods, NELEM(g_methods) );
 
-    g_clazz.method_onVideoFrame = J4A_GetStaticMethodID__catchAll(env, g_clazz.clazz, "onVideoFrame", "(Ljava/lang/Object;Ljava/nio/ByteBuffer;DI)V");
+    g_clazz.method_onVideoFrame = J4A_GetStaticMethodID__catchAll(env, g_clazz.clazz, "onVideoFrame", "(Ljava/lang/Object;Ljava/nio/ByteBuffer;DIII)V");
     if (g_clazz.method_onVideoFrame == NULL) {
         J4A_ThrowIllegalStateException(env, "find IjkMediaPlayer>onVideoFrame() failed!");
     }
@@ -1211,11 +1211,12 @@ JNIEXPORT void JNI_OnUnload(JavaVM *jvm, void *reserved)
     pthread_mutex_destroy(&g_clazz.mutex);
 }
 
-void IjkMediaPlayer_onVideoFrame__catchAll(JNIEnv *env, jobject weakThiz, jobject buffer, jdouble pts,
-                                      jint format)
+void IjkMediaPlayer_onVideoFrame__catchAll(JNIEnv *env, jobject weakThiz,
+                                           jobject buffer, jdouble pts,
+                                           jint format, jint width, jint height)
 {
     (*env)->CallStaticVoidMethod(env, g_clazz.clazz, g_clazz.method_onVideoFrame, weakThiz,
-                                 buffer, pts, format);
+                                 buffer, pts, format, width, height);
     J4A_ExceptionCheck__catchAll(env);
 }
 void IjkMediaPlayer_onAudioFrame__catchAll(JNIEnv *env, jobject weakThiz, jobject buffer, jdouble pts)

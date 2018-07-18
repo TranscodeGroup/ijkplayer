@@ -317,6 +317,7 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
 
         try {
             mMediaPlayer = createPlayer(mSettings.getPlayer());
+            setupFrameAvailableListener();
 
             // TODO: create SubtitleController in MediaPlayer, but we need
             // a context for the subtitle renderers
@@ -1260,9 +1261,18 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         return MediaPlayerCompat.getSelectedTrack(mMediaPlayer, trackType);
     }
 
+    private IjkMediaPlayer.OnFrameAvailableListener mOnFrameAvailableListener;
+
     public void setOnFrameAvailableListener(IjkMediaPlayer.OnFrameAvailableListener listener){
+        mOnFrameAvailableListener = listener;
+        if (mMediaPlayer != null) {
+            setupFrameAvailableListener();
+        }
+    }
+
+    private void setupFrameAvailableListener() {
         if (mMediaPlayer instanceof IjkMediaPlayer) {
-            ((IjkMediaPlayer) mMediaPlayer).setOnFrameAvailableListener(listener);
+            ((IjkMediaPlayer) mMediaPlayer).setOnFrameAvailableListener(mOnFrameAvailableListener);
         } else {
             Log.w(TAG_TG, "mMediaPlayer isn't IjkMediaPlayer, nonsupport setOnFrameAvailableListener");
         }

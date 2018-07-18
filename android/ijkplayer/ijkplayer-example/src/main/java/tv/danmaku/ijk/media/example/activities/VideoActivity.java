@@ -24,6 +24,7 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v4.widget.DrawerLayout;
@@ -38,6 +39,11 @@ import android.view.ViewGroup;
 import android.widget.TableLayout;
 import android.widget.TextView;
 
+import java.io.File;
+import java.util.Locale;
+
+import tv.danmaku.ijk.media.example.widget.media.IjkConstant;
+import tv.danmaku.ijk.media.example.widget.media.MediaRecorder;
 import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 import tv.danmaku.ijk.media.player.misc.ITrackInfo;
 import tv.danmaku.ijk.media.example.R;
@@ -48,11 +54,13 @@ import tv.danmaku.ijk.media.example.widget.media.AndroidMediaController;
 import tv.danmaku.ijk.media.example.widget.media.IjkVideoView;
 import tv.danmaku.ijk.media.example.widget.media.MeasureHelper;
 
+import static tv.danmaku.ijk.media.example.widget.media.MediaEncoderCore.toast;
+
 public class VideoActivity extends AppCompatActivity implements TracksFragment.ITrackHolder {
     private static final String TAG = "VideoActivity";
 
     private String mVideoPath;
-    private Uri    mVideoUri;
+    private Uri mVideoUri;
 
     private AndroidMediaController mMediaController;
     private IjkVideoView mVideoView;
@@ -63,6 +71,7 @@ public class VideoActivity extends AppCompatActivity implements TracksFragment.I
 
     private Settings mSettings;
     private boolean mBackPressed;
+    private MediaRecorder mMediaRecorder;
 
     public static Intent newIntent(Context context, String videoPath, String videoTitle) {
         Intent intent = new Intent(context, VideoActivity.class);
@@ -151,6 +160,7 @@ public class VideoActivity extends AppCompatActivity implements TracksFragment.I
             return;
         }
         mVideoView.start();
+        mMediaRecorder = new MediaRecorder(mVideoView);
     }
 
     @Override
@@ -218,6 +228,16 @@ public class VideoActivity extends AppCompatActivity implements TracksFragment.I
                 transaction.replace(R.id.right_drawer, f);
                 transaction.commit();
                 mDrawerLayout.openDrawer(mRightDrawer);
+            }
+        } else if (id == R.id.action_toggle_recording) {
+            if (!mMediaRecorder.isRecording()) {
+                boolean success = mMediaRecorder.startRecording(new File(Environment.getExternalStorageDirectory(),
+                        String.format(Locale.US, "ijkplayer/%s/media.mp4", IjkConstant.generateNowTime4File(false))));
+                if (!success) {
+                    toast(this, "startRecording failed!");
+                }
+            } else {
+                mMediaRecorder.stopRecording();
             }
         }
 
