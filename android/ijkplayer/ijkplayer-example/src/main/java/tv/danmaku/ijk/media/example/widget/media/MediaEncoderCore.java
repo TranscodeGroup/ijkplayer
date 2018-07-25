@@ -1,33 +1,39 @@
 package tv.danmaku.ijk.media.example.widget.media;
 
 import android.annotation.TargetApi;
-import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.ImageFormat;
-import android.graphics.Rect;
-import android.graphics.YuvImage;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
+import android.media.MediaCodecList;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
 import android.os.Build;
-import android.util.Log;
-import android.widget.Toast;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.text.TextUtils;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Locale;
+import java.util.ArrayList;
+import java.util.List;
+
+import tv.danmaku.ijk.media.example.widget.media.IjkConstant.Value;
+
+import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.api21;
+import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.assertTrue;
+import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.const2str;
+import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.convertPixelFormatToColorFormat;
+import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.convertPixelFormatToColorFormatLegacy;
+import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.info;
+import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.warn;
 
 @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
 public class MediaEncoderCore {
     private static final String MIMETYPE_VIDEO_AVC = "video/avc";
     private static final String MIMETYPE_AUDIO_AAC = "audio/mp4a-latm";
-    private static final int FRAME_RATE = 30;
-    private static final int I_FRAME_INTERVAL = 5;
-    public static final String TAG = "tgtrack";
+    private static final int VIDEO_FPS = 30;
+    private static final int VIDEO_GOP = 150;
+    private static final int VIDEO_I_FRAME_INTERVAL = VIDEO_GOP / VIDEO_FPS;
     private Encoder mVideoEncoder;
     private Encoder mAudioEncoder;
     private MediaMuxer mMuxer;
@@ -35,32 +41,49 @@ public class MediaEncoderCore {
     private static final long TIMEOUT_DEQUEUE_BUFFER_USEC = 10_000; // 10ms
     private boolean mHasAudio;
     private File mOutputFile;
+    private static MediaCodecInfo[] sAvailableAvcCodecs;
 
-
-    public static boolean api23() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M;
+    static {
+        sAvailableAvcCodecs = getAvailableCodecs(MIMETYPE_VIDEO_AVC);
     }
 
-    public static boolean api21() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
-    }
-
-    public static void info(String format, Object... args) {
-        Log.i(TAG, String.format(Locale.getDefault(), format, args));
-    }
-
-    public static void warn(String format, Object... args) {
-        Log.w(TAG, String.format(Locale.getDefault(), format, args));
-    }
-
-    public static void assertTrue(boolean b, String format, Object... args) {
-        if (!b) {
-            throw new RuntimeException(String.format(Locale.getDefault(), format, args));
+    public static MediaCodecInfo[] getAvailableCodecs(String mimeType) {
+        List<MediaCodecInfo> infoList = new ArrayList<>();
+        int count = MediaCodecList.getCodecCount();
+        for (int i = 0; i < count; i++) {
+            MediaCodecInfo codecInfo = MediaCodecList.getCodecInfoAt(i);
+            if (!codecInfo.isEncoder()) {
+                continue;
+            }
+            String[] supportedTypes = codecInfo.getSupportedTypes();
+            for (String type : supportedTypes) {
+                if (type.equalsIgnoreCase(mimeType)) {
+                    infoList.add(codecInfo);
+                }
+            }
         }
+        return infoList.toArray(new MediaCodecInfo[infoList.size()]);
     }
 
-    public static void toast(Context context, String format, Object... args) {
-        Toast.makeText(context, String.format(Locale.getDefault(), format, args), Toast.LENGTH_SHORT).show();
+    public static void printEncoder() {
+        int count = MediaCodecList.getCodecCount();
+        for (int i = 0; i < count; i++) {
+            MediaCodecInfo codecInfo = MediaCodecList.getCodecInfoAt(i);
+            if (!codecInfo.isEncoder()) {
+                continue;
+            }
+            String[] types = codecInfo.getSupportedTypes();
+            for (String type : types) {
+                if (type.equalsIgnoreCase(MIMETYPE_VIDEO_AVC)) {
+                    MediaCodecInfo.CodecCapabilities capabilities = codecInfo.getCapabilitiesForType(type);
+                    String[] colorFormatNames = new String[capabilities.colorFormats.length];
+                    for (int j = 0; j < capabilities.colorFormats.length; j++) {
+                        colorFormatNames[j] = const2str(capabilities.colorFormats[j], MediaCodecInfo.CodecCapabilities.class, "COLOR_Format");
+                    }
+                    info("%s: \n%s", codecInfo.getName(), TextUtils.join("\n", colorFormatNames));
+                }
+            }
+        }
     }
 
     public MediaEncoderCore(boolean hasAudio, File outputFile, int width, int height, int bitRate, int pixelFormat) throws IOException {
@@ -71,17 +94,14 @@ public class MediaEncoderCore {
         }
 
         mVideoEncoder = new Encoder();
-        mVideoEncoder.encoder = MediaCodec.createEncoderByType(MIMETYPE_VIDEO_AVC);
-        int colorFormat = IjkConstant.convertPixelFormatToColorFormat(pixelFormat);
-        MediaCodecInfo.CodecCapabilities capabilities = mVideoEncoder.encoder.getCodecInfo().getCapabilitiesForType(MIMETYPE_VIDEO_AVC);
-        for (int f : capabilities.colorFormats) {
-            info("support color format: %s (%s)", f, f == colorFormat);
-        }
+        Value<Integer> outColorFormat = new Value<>();
+        MediaCodecInfo videoCodecInfo = selectAvcCodec(pixelFormat, outColorFormat);
+        mVideoEncoder.encoder = MediaCodec.createByCodecName(videoCodecInfo.getName());
         MediaFormat format = MediaFormat.createVideoFormat(MIMETYPE_VIDEO_AVC, width, height);
-        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat);
+        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, outColorFormat.get());
         format.setInteger(MediaFormat.KEY_BIT_RATE, bitRate);
-        format.setInteger(MediaFormat.KEY_FRAME_RATE, FRAME_RATE);
-        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, I_FRAME_INTERVAL);
+        format.setInteger(MediaFormat.KEY_FRAME_RATE, VIDEO_FPS);
+        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, VIDEO_I_FRAME_INTERVAL);
         info("video format: %s", format);
         mVideoEncoder.encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
         mVideoEncoder.encoder.start();
@@ -98,6 +118,38 @@ public class MediaEncoderCore {
         }
 
         mMuxer = new MediaMuxer(outputFile.toString(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+    }
+
+    @NonNull
+    private MediaCodecInfo selectAvcCodec(int pixelFormat, Value<Integer> outColorFormat) {
+        int colorFormat = convertPixelFormatToColorFormatLegacy(pixelFormat);
+        MediaCodecInfo codecInfo = selectAvcCodecByColorFormat(colorFormat, outColorFormat);
+        if (codecInfo != null) {
+            return codecInfo;
+        }
+        if (api21()) {
+            int colorFormatMaybeFlexible = convertPixelFormatToColorFormat(pixelFormat);
+            codecInfo = selectAvcCodecByColorFormat(colorFormatMaybeFlexible, outColorFormat);
+            if (codecInfo != null) {
+                // return codecInfo;
+                throw new UnsupportedOperationException(/*TODO 2018-07-25*/"todo support flexible format");
+            }
+        }
+        throw new IllegalArgumentException("unsupported pixelFormat: " + pixelFormat);
+    }
+
+    @Nullable
+    private MediaCodecInfo selectAvcCodecByColorFormat(int colorFormat, Value<Integer> outColorFormat) {
+        for (MediaCodecInfo codecInfo : sAvailableAvcCodecs) {
+            MediaCodecInfo.CodecCapabilities capabilities = codecInfo.getCapabilitiesForType(MIMETYPE_VIDEO_AVC);
+            for (int format : capabilities.colorFormats) {
+                if (format == colorFormat) {
+                    outColorFormat.set(format);
+                    return codecInfo;
+                }
+            }
+        }
+        return null;
     }
 
     private boolean tryStartMuxer() {

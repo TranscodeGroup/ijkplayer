@@ -1,6 +1,5 @@
 package tv.danmaku.ijk.media.example.widget.media;
 
-import android.graphics.Bitmap;
 import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.MainThread;
@@ -11,10 +10,9 @@ import java.nio.ByteBuffer;
 import tv.danmaku.ijk.media.example.BuildConfig;
 import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 
-import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.convertNV21ToBitmap;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.saveBufferToFile;
-import static tv.danmaku.ijk.media.example.widget.media.MediaEncoderCore.info;
-import static tv.danmaku.ijk.media.example.widget.media.MediaEncoderCore.warn;
+import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.info;
+import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.warn;
 
 public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
     /* ----- assessed by encoder thread ----- */
