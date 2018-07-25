@@ -54,7 +54,7 @@ import tv.danmaku.ijk.media.example.widget.media.AndroidMediaController;
 import tv.danmaku.ijk.media.example.widget.media.IjkVideoView;
 import tv.danmaku.ijk.media.example.widget.media.MeasureHelper;
 
-import static tv.danmaku.ijk.media.example.widget.media.MediaEncoderCore.toast;
+import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.toast;
 
 public class VideoActivity extends AppCompatActivity implements TracksFragment.ITrackHolder {
     private static final String TAG = "VideoActivity";
