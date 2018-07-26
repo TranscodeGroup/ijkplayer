@@ -1550,6 +1550,7 @@ char *ijk_array_to_hex(uint8_t *arr, int size) {
         }
         str_p += sprintf(str_p, "%02X", arr[i]);
     }
+    *str_p = '\0';
     return str;
 }
 
