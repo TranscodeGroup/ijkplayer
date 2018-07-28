@@ -1103,7 +1103,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
 
     public interface OnFrameAvailableListener{
         void onVideoFrame(ByteBuffer buffer, double pts, int format, int width, int height);
-        void onAudioFrame(ByteBuffer buffer, double pts);
+        void onAudioFrame(ByteBuffer buffer, double pts, int sampleRate, long channelLayout);
     }
 
     @CalledByNative
@@ -1117,12 +1117,12 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
         }
     }
     @CalledByNative
-    private static  void onAudioFrame(Object weakThiz,ByteBuffer buffer, double pts){
+    private static  void onAudioFrame(Object weakThiz,ByteBuffer buffer, double pts, int sampleRate, long channelLayout){
        IjkMediaPlayer thiz = ((WeakReference<IjkMediaPlayer>) weakThiz).get();
        if (thiz != null) {
-           DebugLog.ifmt(TAG_TG, "onAudioFrame: %s, %s", buffer, pts);
+           DebugLog.ifmt(TAG_TG, "onAudioFrame: %s, %s, %s, %s", buffer, pts, sampleRate, channelLayout);
            if (thiz.mOnFrameAvailableListener != null) {
-               thiz.mOnFrameAvailableListener.onAudioFrame(buffer, pts);
+               thiz.mOnFrameAvailableListener.onAudioFrame(buffer, pts, sampleRate, channelLayout);
            }
        }
    }

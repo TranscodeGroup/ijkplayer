@@ -712,6 +712,7 @@ typedef struct FFPlayer {
     int get_frame_mode;
     GetImgInfo *get_img_info;
     jobject pixel_buffer;
+    jobject pcm_buffer;
 } FFPlayer;
 
 #define fftime_to_milliseconds(ts) (av_rescale(ts, 1000, AV_TIME_BASE))
@@ -773,6 +774,7 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     ffp->pipeline               = NULL;
     ffp->node_vdec              = NULL;
     ffp->pixel_buffer           = NULL; /* reset outside */
+    ffp->pcm_buffer             = NULL; /* reset outside */
     ffp->sar_num                = 0;
     ffp->sar_den                = 0;
 

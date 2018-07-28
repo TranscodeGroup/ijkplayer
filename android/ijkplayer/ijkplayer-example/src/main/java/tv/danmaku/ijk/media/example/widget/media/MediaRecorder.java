@@ -23,6 +23,8 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
     private volatile int mVideoFormat = IjkConstant.Format.INVALID;
     private volatile int mVideoWidth = 0;
     private volatile int mVideoHeight = 0;
+    private volatile int mAudioSampleRate;
+    private volatile long mAudioChannelLayout;
     private final Object mStateLock = new Object();
     private boolean mRunning;
     private boolean mHandlerReady;
@@ -67,7 +69,10 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
         }
         mEncoderHandler.post(() -> {
             try {
-                mEncoder = new MediaEncoderCore(false, outFile, mVideoWidth, mVideoHeight, 1_000_000, mVideoFormat);
+                mEncoder = new MediaEncoderCore(true, outFile,
+                        mVideoWidth, mVideoHeight, 1_000_000, mVideoFormat,
+                        mAudioSampleRate, mAudioChannelLayout
+                );
             } catch (Throwable e) {
                 throw new RuntimeException("init encoder failed!", e);
             }
@@ -142,7 +147,9 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
     }
 
     @Override
-    public void onAudioFrame(ByteBuffer buffer, double pts) {
+    public void onAudioFrame(ByteBuffer buffer, double pts, int sampleRate, long channelLayout) {
+        mAudioSampleRate = sampleRate;
+        mAudioChannelLayout = channelLayout;
         commitAudioFrame(buffer, (long) (pts * 1000 * 1000));
     }
 }
