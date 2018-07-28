@@ -1,6 +1,7 @@
 package tv.danmaku.ijk.media.example.widget.media;
 
 import android.annotation.TargetApi;
+import android.media.AudioFormat;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
@@ -24,6 +25,7 @@ import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.assertTrue;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.const2str;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.convertPixelFormatToColorFormat;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.convertPixelFormatToColorFormatLegacy;
+import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.convertToChannelMask;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.info;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.warn;
 
@@ -86,7 +88,10 @@ public class MediaEncoderCore {
         }
     }
 
-    public MediaEncoderCore(boolean hasAudio, File outputFile, int width, int height, int bitRate, int pixelFormat) throws IOException {
+    public MediaEncoderCore(boolean hasAudio, File outputFile,
+                            int width, int height, int bitRate, int pixelFormat,
+                            int audioSampleRate, long channelLayout
+    ) throws IOException {
         mHasAudio = hasAudio;
         mOutputFile = outputFile;
         if (!outputFile.getParentFile().exists() && !outputFile.getParentFile().mkdirs()) {
@@ -108,7 +113,19 @@ public class MediaEncoderCore {
 
         if (mHasAudio) {
             mAudioEncoder = new Encoder();
-            MediaFormat audioFormat = MediaFormat.createAudioFormat(MIMETYPE_AUDIO_AAC, 44100, 2);
+            int channelCount;
+            switch (convertToChannelMask(channelLayout)) {
+                case AudioFormat.CHANNEL_OUT_MONO:
+                    channelCount = 1;
+                    break;
+                case AudioFormat.CHANNEL_OUT_STEREO:
+                    channelCount = 2;
+                    break;
+                default:
+                    throw new IllegalArgumentException("unsupported channelLayout: " + channelLayout);
+            }
+            MediaFormat audioFormat = MediaFormat.createAudioFormat(MIMETYPE_AUDIO_AAC, audioSampleRate, channelCount);
+            // audioFormat.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT); // only support PCM16
             audioFormat.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
             audioFormat.setInteger(MediaFormat.KEY_BIT_RATE, 128000);
             info("audio format: %s", audioFormat);
@@ -153,7 +170,8 @@ public class MediaEncoderCore {
     }
 
     private boolean tryStartMuxer() {
-        if (!mMuxerStarted && mVideoEncoder.outputFormat != null
+        if (!mMuxerStarted
+                && mVideoEncoder.outputFormat != null
                 && !(mHasAudio && mAudioEncoder.outputFormat == null)) {
             mVideoEncoder.trackIndex = mMuxer.addTrack(mVideoEncoder.outputFormat);
             if (mHasAudio) {

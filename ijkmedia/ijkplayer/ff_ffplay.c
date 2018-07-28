@@ -1601,6 +1601,62 @@ static bool send_frame_to_java(FFPlayer *ffp, Frame *vp)
     return 0;
 }
 
+static void ffp_buffer_free_p(jobject *buffer);
+
+static int send_frame_to_java_audio(FFPlayer *ffp, Frame *af)
+{
+    AVFrame *frame = af->frame;
+    if (!(frame->channel_layout == AV_CH_LAYOUT_MONO || frame->channel_layout == AV_CH_LAYOUT_STEREO)
+        || !(frame->format == AV_SAMPLE_FMT_S16 || frame->format == AV_SAMPLE_FMT_FLTP)) {
+        TGLOGW("unsupported channel_layout: %ld, format: %d",
+               (long) frame->channel_layout, frame->format);
+        return -1;
+    }
+    JNIEnv *env = NULL;
+    if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
+        ALOGE("%s: SetupThreadEnv failed\n", __func__);
+        return -1;
+    }
+    // see: audio_decode_frame()/ff_ffplay.c
+    int data_size = av_samples_get_buffer_size(NULL, av_frame_get_channels(frame),
+                                               frame->nb_samples, frame->format, 1);
+    if (!ffp->pcm_buffer) {
+        TGLOGI("allocate pcm_buffer, %d", data_size);
+        ffp->pcm_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, data_size);
+        if (!ffp->pcm_buffer) {
+            J4A_FUNC_FAIL_TRACE();
+            return -1;
+        }
+    } else {
+        jlong capacity = (*env)->GetDirectBufferCapacity(env, ffp->pcm_buffer);
+        if (capacity < data_size) {
+            TGLOGI("reallocate pcm_buffer, %d => %d", capacity, data_size);
+            ffp_buffer_free_p(&ffp->pcm_buffer);
+            ffp->pcm_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, data_size);
+            if (!ffp->pcm_buffer) {
+                J4A_FUNC_FAIL_TRACE();
+                return -1;
+            }
+        }
+    }
+    jobject tmp_buffer = J4AC_ByteBuffer__limit(env, ffp->pcm_buffer, data_size);
+    if (J4A_ExceptionCheck__catchAll(env) || !tmp_buffer) {
+        TGLOGW("exec pcm_buffer.limit(%d) failed.", data_size);
+        return -1;
+    }
+    J4A_DeleteLocalRef__p(env, &tmp_buffer);
+    void *c_buffer = J4AC_ByteBuffer__getDirectBufferAddress__catchAll(env, ffp->pcm_buffer);
+    if (!c_buffer) {
+        return -1;
+    }
+    uint8_t *bytes = frame->data[0];
+    // todo: fltp to s16 (https://stackoverflow.com/questions/14989397/how-to-convert-sample-rate-from-av-sample-fmt-fltp-to-av-sample-fmt-s16)
+    memcpy(c_buffer, bytes, (size_t) data_size);
+
+    IjkMediaPlayer_onAudioFrame__catchAll(env, ffp->inject_opaque, ffp->pcm_buffer, af->pts,
+                                          frame->sample_rate, frame->channel_layout);
+}
+
 static int send_frame_to_java3(FFPlayer *ffp, Frame *vp, AVFrame *frame)
 {
     // TGLOGI("send_frame_to_java");
@@ -2280,6 +2336,7 @@ static int audio_thread(void *arg)
                 af->duration = av_q2d((AVRational){frame->nb_samples, frame->sample_rate});
 
                 av_frame_move_ref(af->frame, frame);
+                send_frame_to_java_audio(ffp, af);
                 frame_queue_push(&is->sampq);
 
 #if CONFIG_AVFILTER
@@ -4065,9 +4122,9 @@ FFPlayer *ffp_create()
     return ffp;
 }
 
-static void ffpixel_buffer_free_p(jobject *pixel_buffer)
+static void ffp_buffer_free_p(jobject *buffer)
 {
-    if (!pixel_buffer) {
+    if (!buffer) {
         return;
     }
     JNIEnv *env = NULL;
@@ -4075,7 +4132,7 @@ static void ffpixel_buffer_free_p(jobject *pixel_buffer)
         ALOGE("%s: SetupThreadEnv failed\n", __func__);
         return;
     }
-    J4A_DeleteGlobalRef__p(env, pixel_buffer);
+    J4A_DeleteGlobalRef__p(env, buffer);
 }
 
 void ffp_destroy(FFPlayer *ffp)
@@ -4094,7 +4151,8 @@ void ffp_destroy(FFPlayer *ffp)
     ffpipenode_free_p(&ffp->node_vdec);
     ffpipeline_free_p(&ffp->pipeline);
     ijkmeta_destroy_p(&ffp->meta);
-    ffpixel_buffer_free_p(&ffp->pixel_buffer);
+    ffp_buffer_free_p(&ffp->pixel_buffer);
+    ffp_buffer_free_p(&ffp->pcm_buffer);
     ffp_reset_internal(ffp);
 
     SDL_DestroyMutexP(&ffp->af_mutex);

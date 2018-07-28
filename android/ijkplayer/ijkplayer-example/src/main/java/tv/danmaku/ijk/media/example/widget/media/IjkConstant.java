@@ -7,6 +7,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
 import android.graphics.Rect;
 import android.graphics.YuvImage;
+import android.media.AudioFormat;
 import android.media.MediaCodecInfo;
 import android.os.Build;
 import android.util.Log;
@@ -24,6 +25,9 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import java.util.Objects;
+
+import static tv.danmaku.ijk.media.player.IjkMediaMeta.AV_CH_LAYOUT_MONO;
+import static tv.danmaku.ijk.media.player.IjkMediaMeta.AV_CH_LAYOUT_STEREO;
 
 public class IjkConstant {
 
@@ -58,6 +62,15 @@ public class IjkConstant {
 
     public static int convertPixelFormatToColorFormatLegacy(int pixelFormat) {
         return convertPixelFormatToColorFormat(sPixelFormatToColorFormatLegacy, pixelFormat);
+    }
+
+    public static int convertToChannelMask(long nativeChannelLayout) {
+        if (nativeChannelLayout == AV_CH_LAYOUT_MONO) {
+            return AudioFormat.CHANNEL_OUT_MONO;
+        } else if (nativeChannelLayout == AV_CH_LAYOUT_STEREO) {
+            return AudioFormat.CHANNEL_OUT_STEREO;
+        }
+        throw new UnsupportedOperationException("unsupported nativeChannelLayout: " + nativeChannelLayout);
     }
 
     private static int convertPixelFormatToColorFormat(SparseIntArray pixelFormatToColorFormat, int pixelFormat) {
@@ -178,6 +191,23 @@ public class IjkConstant {
         int AV_PIX_FMT_YUVJ420P = 12;
         int AV_PIX_FMT_YUVJ422P = 13;
         int AV_PIX_FMT_YUVJ444P = 14;
+    }
+
+    public interface SampleFormat {
+        int AV_SAMPLE_FMT_NONE = -1;
+        int AV_SAMPLE_FMT_U8 = 0;          ///< unsigned 8 bits
+        int AV_SAMPLE_FMT_S16 = 1;         ///< signed 16 bits
+        int AV_SAMPLE_FMT_S32 = 2;         ///< signed 32 bits
+        int AV_SAMPLE_FMT_FLT = 3;         ///< float
+        int AV_SAMPLE_FMT_DBL = 4;         ///< double
+        int AV_SAMPLE_FMT_U8P = 5;         ///< unsigned 8 bits, planar
+        int AV_SAMPLE_FMT_S16P = 6;        ///< signed 16 bits, planar
+        int AV_SAMPLE_FMT_S32P = 7;        ///< signed 32 bits, planar
+        int AV_SAMPLE_FMT_FLTP = 8;        ///< float, planar
+        int AV_SAMPLE_FMT_DBLP = 9;        ///< double, planar
+        int AV_SAMPLE_FMT_S64 = 10;         ///< signed 64 bits
+        int AV_SAMPLE_FMT_S64P = 11;        ///< signed 64 bits, planar
+        int AV_SAMPLE_FMT_NB = 12;          ///< Number of sample formats. DO NOT USE if linking dynamically
     }
 
     public static class Value<T> {

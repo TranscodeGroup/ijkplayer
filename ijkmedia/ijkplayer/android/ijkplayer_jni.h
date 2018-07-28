@@ -12,6 +12,6 @@ void IjkMediaPlayer_onVideoFrame__catchAll(JNIEnv *env, jobject weakThiz,
                                            jint format, jint width, jint height);
 
 void IjkMediaPlayer_onAudioFrame__catchAll(JNIEnv *env, jobject weakThiz,
-                                           jobject buffer, jdouble pts);
+                                           jobject buffer, jdouble pts, jint sampleRate, jlong channelLayout);
 
 #endif //IJKPLAYER_IJKPLAYER_JNI_H
