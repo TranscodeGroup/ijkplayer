@@ -94,25 +94,23 @@ public class IjkConstant {
         return bitmap;
     }
 
-    public static File saveBufferToFile(ByteBuffer buffer, int width, int height, String dirPath) {
-        File file = new File(dirPath,
-                String.format(Locale.US, "%s_%sx%s.yuv", generateNowTime4File(false), width, height));
-        if (file.exists()) {
-            return null;
+    public static boolean saveBufferToFile(ByteBuffer buffer, File file, boolean append) {
+        if (!append && file.exists()) {
+            return false;
         }
         if (!file.getParentFile().exists() && !file.getParentFile().mkdirs()) {
             warn("create dir %s filed.", file.getParentFile());
-            return null;
+            return false;
         }
-        try (FileOutputStream fos = new FileOutputStream(file)) {
+        try (FileOutputStream fos = new FileOutputStream(file, append)) {
             byte[] bytes = new byte[buffer.rewind().remaining()];
             buffer.get(bytes);
             fos.write(bytes);
-            return file;
+            return true;
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return null;
+        return false;
     }
 
     public static String generateNowTime4File(boolean withMs) {

@@ -329,6 +329,9 @@ public class MediaEncoderCore {
                     }
                     this.encoder.releaseOutputBuffer(index, false);
                     if ((this.bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                        // video encoder: end of stream with 0size 0pts
+                        // audio encoder: end of stream with 316size 62742999pts
+                        // todo: why them diff?
                         if (!waitToEnd) {
                             warn("reached end of stream unexpectedly (info: %s)", stringOf(this.bufferInfo));
                         } else {

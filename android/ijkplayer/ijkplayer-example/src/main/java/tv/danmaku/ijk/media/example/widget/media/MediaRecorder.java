@@ -6,10 +6,12 @@ import android.support.annotation.MainThread;
 
 import java.io.File;
 import java.nio.ByteBuffer;
+import java.util.Locale;
 
 import tv.danmaku.ijk.media.example.BuildConfig;
 import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 
+import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.generateNowTime4File;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.saveBufferToFile;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.info;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.warn;
@@ -119,9 +121,13 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
             if (encoder == null) {
                 return;
             }
-            if (isVideo && false) {
-                File file = saveBufferToFile(buffer, mVideoWidth, mVideoHeight, mEncoderCore.getOutputFile().getParentFile().toString());
-                if (file != null) {
+            if (true) {
+                File outputFile = mEncoderCore.getOutputFile();
+                File file = new File(outputFile.getParentFile(), isVideo
+                        ? String.format(Locale.US, "%s_%sx%s.yuv", generateNowTime4File(false), mVideoWidth, mVideoHeight)
+                        : outputFile.getName().split("\\.")[0] + ".pcm");
+                boolean append = !isVideo;
+                if (saveBufferToFile(buffer, file, append)) {
                     info("save to %s", file);
                 }
             }
