@@ -1,5 +1,6 @@
 package tv.danmaku.ijk.media.example.widget.media;
 
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.media.AudioFormat;
 import android.media.MediaCodec;
@@ -27,7 +28,6 @@ import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.convertPixel
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.convertPixelFormatToColorFormatLegacy;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.convertToChannelMask;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.info;
-import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.warn;
 
 @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
 public class MediaEncoderCore {
@@ -36,12 +36,13 @@ public class MediaEncoderCore {
     private static final int VIDEO_FPS = 30;
     private static final int VIDEO_GOP = 150;
     private static final int VIDEO_I_FRAME_INTERVAL = VIDEO_GOP / VIDEO_FPS;
+    @Nullable
     private Encoder mVideoEncoder;
+    @Nullable
     private Encoder mAudioEncoder;
     private MediaMuxer mMuxer;
     private boolean mMuxerStarted = false;
     private static final long TIMEOUT_DEQUEUE_BUFFER_USEC = 10_000; // 10ms
-    private boolean mHasAudio;
     private File mOutputFile;
     private static MediaCodecInfo[] sAvailableAvcCodecs;
 
@@ -88,30 +89,32 @@ public class MediaEncoderCore {
         }
     }
 
-    public MediaEncoderCore(boolean hasAudio, File outputFile,
+    @SuppressLint("WrongConstant")
+    public MediaEncoderCore(boolean hasVideo, boolean hasAudio, File outputFile,
                             int width, int height, int bitRate, int pixelFormat,
                             int audioSampleRate, long channelLayout
     ) throws IOException {
-        mHasAudio = hasAudio;
         mOutputFile = outputFile;
         if (!outputFile.getParentFile().exists() && !outputFile.getParentFile().mkdirs()) {
             throw new IOException("create outputDir failed!");
         }
 
-        mVideoEncoder = new Encoder();
-        Value<Integer> outColorFormat = new Value<>();
-        MediaCodecInfo videoCodecInfo = selectAvcCodec(pixelFormat, outColorFormat);
-        mVideoEncoder.encoder = MediaCodec.createByCodecName(videoCodecInfo.getName());
-        MediaFormat format = MediaFormat.createVideoFormat(MIMETYPE_VIDEO_AVC, width, height);
-        format.setInteger(MediaFormat.KEY_COLOR_FORMAT, outColorFormat.get());
-        format.setInteger(MediaFormat.KEY_BIT_RATE, bitRate);
-        format.setInteger(MediaFormat.KEY_FRAME_RATE, VIDEO_FPS);
-        format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, VIDEO_I_FRAME_INTERVAL);
-        info("video format: %s", format);
-        mVideoEncoder.encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
-        mVideoEncoder.encoder.start();
+        if (hasVideo) {
+            mVideoEncoder = new Encoder();
+            Value<Integer> outColorFormat = new Value<>();
+            MediaCodecInfo videoCodecInfo = selectAvcCodec(pixelFormat, outColorFormat);
+            mVideoEncoder.encoder = MediaCodec.createByCodecName(videoCodecInfo.getName());
+            MediaFormat format = MediaFormat.createVideoFormat(MIMETYPE_VIDEO_AVC, width, height);
+            format.setInteger(MediaFormat.KEY_COLOR_FORMAT, outColorFormat.get());
+            format.setInteger(MediaFormat.KEY_BIT_RATE, bitRate);
+            format.setInteger(MediaFormat.KEY_FRAME_RATE, VIDEO_FPS);
+            format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, VIDEO_I_FRAME_INTERVAL);
+            info("video format: %s", format);
+            mVideoEncoder.encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            mVideoEncoder.encoder.start();
+        }
 
-        if (mHasAudio) {
+        if (hasAudio) {
             mAudioEncoder = new Encoder();
             int channelCount;
             switch (convertToChannelMask(channelLayout)) {
@@ -126,7 +129,7 @@ public class MediaEncoderCore {
             }
             MediaFormat audioFormat = MediaFormat.createAudioFormat(MIMETYPE_AUDIO_AAC, audioSampleRate, channelCount);
             // audioFormat.setInteger(MediaFormat.KEY_PCM_ENCODING, AudioFormat.ENCODING_PCM_16BIT); // only support PCM16
-            audioFormat.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
+            // audioFormat.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
             audioFormat.setInteger(MediaFormat.KEY_BIT_RATE, 128000);
             info("audio format: %s", audioFormat);
             mAudioEncoder.encoder = MediaCodec.createEncoderByType(MIMETYPE_AUDIO_AAC);
@@ -171,10 +174,12 @@ public class MediaEncoderCore {
 
     private boolean tryStartMuxer() {
         if (!mMuxerStarted
-                && mVideoEncoder.outputFormat != null
-                && !(mHasAudio && mAudioEncoder.outputFormat == null)) {
-            mVideoEncoder.trackIndex = mMuxer.addTrack(mVideoEncoder.outputFormat);
-            if (mHasAudio) {
+                && (mVideoEncoder == null || mVideoEncoder.outputFormat != null)
+                && (mAudioEncoder == null || mAudioEncoder.outputFormat != null)) {
+            if (mVideoEncoder != null) {
+                mVideoEncoder.trackIndex = mMuxer.addTrack(mVideoEncoder.outputFormat);
+            }
+            if (mAudioEncoder != null) {
                 mAudioEncoder.trackIndex = mMuxer.addTrack(mAudioEncoder.outputFormat);
             }
             mMuxer.start();
@@ -184,22 +189,12 @@ public class MediaEncoderCore {
         return false;
     }
 
-    public void drainVideoEncoder(boolean waitToEnd) {
-        mVideoEncoder.drainEncoder(waitToEnd);
+    public Encoder getVideoEncoder() {
+        return mVideoEncoder;
     }
 
-    public void drainAudioEncoder(boolean waitToEnd) {
-        if (!mHasAudio) return;
-        mAudioEncoder.drainEncoder(waitToEnd);
-    }
-
-    public void commitVideoFrame(ByteBuffer buffer, long ptsUs, boolean endOfStream) {
-        mVideoEncoder.commitFrame(buffer, ptsUs, endOfStream);
-    }
-
-    public void commitAudioFrame(ByteBuffer buffer, long ptsUs, boolean endOfStream) {
-        if (!mHasAudio) return;
-        mAudioEncoder.commitFrame(buffer, ptsUs, endOfStream);
+    public Encoder getAudioEncoder() {
+        return mAudioEncoder;
     }
 
     public void release() {
@@ -208,7 +203,7 @@ public class MediaEncoderCore {
             mVideoEncoder.release();
             mVideoEncoder = null;
         }
-        if (mHasAudio && mAudioEncoder != null) {
+        if (mAudioEncoder != null) {
             mAudioEncoder.release();
             mAudioEncoder = null;
         }
@@ -223,10 +218,12 @@ public class MediaEncoderCore {
         return mOutputFile;
     }
 
-    private class Encoder {
+    public class Encoder {
         MediaCodec encoder;
         MediaFormat outputFormat;
         int trackIndex = -1;
+        long ptsOffset = 0;
+        long lastPts = 0;
         MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
 
         public void release() {
@@ -237,18 +234,35 @@ public class MediaEncoderCore {
             }
         }
 
+        private void info(String format, Object... args) {
+            IjkConstant.info(encoder.getName() + ": " + format, args);
+        }
+
+        private String stringOf(MediaCodec.BufferInfo info) {
+            return String.format("BufferInfo{offset=%s, size=%s, pts=%s, flags=%s}", info.offset, info.size, info.presentationTimeUs, info.flags);
+        }
+
+        private void warn(String format, Object... args) {
+            IjkConstant.warn(encoder.getName() + ": " + format, args);
+        }
+
+        public long getLastPts() {
+            return lastPts;
+        }
+
         public void commitFrame(ByteBuffer buffer, long ptsUs, boolean endOfStream) {
             ByteBuffer[] inputBuffers = encoder.getInputBuffers();
             int index = encoder.dequeueInputBuffer(TIMEOUT_DEQUEUE_BUFFER_USEC);
             if (index >= 0) {
+                ByteBuffer inputBuffer = inputBuffers[index];
+                int offset = inputBuffer.position();
                 if (endOfStream) {
-                    encoder.queueInputBuffer(index, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                    encoder.queueInputBuffer(index, offset, 0, ptsUs, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                     info("sent input EOS");
                 } else {
                     int size = buffer.rewind().remaining(); // in jni, have not reset position to 0, so we need to rewind().
-                    ByteBuffer inputBuffer = inputBuffers[index];
                     inputBuffer.put(buffer);
-                    encoder.queueInputBuffer(index, 0, size, ptsUs, 0);
+                    encoder.queueInputBuffer(index, offset, size, ptsUs, 0);
                     info("submitted frame to encoder, size=%s, ptsUs=%s", size, ptsUs);
                 }
             } else {
@@ -280,7 +294,10 @@ public class MediaEncoderCore {
                     assertTrue(this.outputFormat == null, "format changed twice");
                     this.outputFormat = this.encoder.getOutputFormat();
                     if (!tryStartMuxer()) {
-                        break; // wait muxer to start
+                        info("wait muxer to start, encoder state: %s, %s", mVideoEncoder, mAudioEncoder);
+                        break;
+                    } else {
+                        info("muxer started");
                     }
                 } else if (index < 0) {
                     warn("unexpected result from encoder.dequeueOutputBuffer: %s", index);
@@ -292,19 +309,30 @@ public class MediaEncoderCore {
                         this.bufferInfo.size = 0;
                     }
                     if (this.bufferInfo.size != 0) {
+                        if (false) {
+                            // adjust pts to start from 0
+                            if (this.bufferInfo.presentationTimeUs != 0) { // maybe 0 if END_OF_STREAM
+                                if (this.ptsOffset == 0) {
+                                    this.ptsOffset = this.bufferInfo.presentationTimeUs;
+                                    this.bufferInfo.presentationTimeUs = 0;
+                                } else {
+                                    this.bufferInfo.presentationTimeUs -= this.ptsOffset;
+                                }
+                            }
+                        }
                         // adjust buffer to match bufferInfo
                         buffer.position(this.bufferInfo.offset);
                         buffer.limit(this.bufferInfo.offset + this.bufferInfo.size);
-
                         mMuxer.writeSampleData(this.trackIndex, buffer, this.bufferInfo);
-                        info("sent %s bytes to muxer", this.bufferInfo.size);
+                        info("sent %s bytes to muxer on %s", this.bufferInfo.size, this.bufferInfo.presentationTimeUs);
+                        lastPts = this.bufferInfo.presentationTimeUs;
                     }
                     this.encoder.releaseOutputBuffer(index, false);
                     if ((this.bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                         if (!waitToEnd) {
-                            warn("reached end of stream unexpectedly");
+                            warn("reached end of stream unexpectedly (info: %s)", stringOf(this.bufferInfo));
                         } else {
-                            info("end of stream reached");
+                            info("end of stream reached (info: %s)", stringOf(this.bufferInfo));
                         }
                         break;
                     }
@@ -314,7 +342,7 @@ public class MediaEncoderCore {
 
         @Override
         public String toString() {
-            return "Encoder{encoder=" + encoder + ", trackIndex=" + trackIndex + '}';
+            return "Encoder{encoder=" + encoder + ", outputFormat=" + outputFormat + ", trackIndex=" + trackIndex + '}';
         }
     }
 }

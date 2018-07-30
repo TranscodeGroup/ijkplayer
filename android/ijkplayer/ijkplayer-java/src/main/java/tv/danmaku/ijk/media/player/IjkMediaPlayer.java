@@ -1120,7 +1120,7 @@ public final class IjkMediaPlayer extends AbstractMediaPlayer {
     private static  void onAudioFrame(Object weakThiz,ByteBuffer buffer, double pts, int sampleRate, long channelLayout){
        IjkMediaPlayer thiz = ((WeakReference<IjkMediaPlayer>) weakThiz).get();
        if (thiz != null) {
-           DebugLog.ifmt(TAG_TG, "onAudioFrame: %s, %s, %s, %s", buffer, pts, sampleRate, channelLayout);
+           // DebugLog.ifmt(TAG_TG, "onAudioFrame: %s, %s, %s, %s", buffer, pts, sampleRate, channelLayout);
            if (thiz.mOnFrameAvailableListener != null) {
                thiz.mOnFrameAvailableListener.onAudioFrame(buffer, pts, sampleRate, channelLayout);
            }

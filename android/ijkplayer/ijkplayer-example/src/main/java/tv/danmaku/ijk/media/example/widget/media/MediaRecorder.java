@@ -16,7 +16,7 @@ import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.warn;
 
 public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
     /* ----- assessed by encoder thread ----- */
-    private MediaEncoderCore mEncoder;
+    private MediaEncoderCore mEncoderCore;
 
     /* ----- assessed by multiple threads ----- */
     private volatile Handler mEncoderHandler;
@@ -69,7 +69,7 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
         }
         mEncoderHandler.post(() -> {
             try {
-                mEncoder = new MediaEncoderCore(true, outFile,
+                mEncoderCore = new MediaEncoderCore(true, true, outFile,
                         mVideoWidth, mVideoHeight, 1_000_000, mVideoFormat,
                         mAudioSampleRate, mAudioChannelLayout
                 );
@@ -83,11 +83,9 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
     @MainThread
     public void stopRecording() {
         mEncoderHandler.post(() -> {
-            mEncoder.commitVideoFrame(null, 0, true);
-            mEncoder.commitAudioFrame(null, 0, true);
-            mEncoder.drainVideoEncoder(true);
-            mEncoder.drainAudioEncoder(true);
-            mEncoder.release();
+            signalEndOfStream(mEncoderCore.getVideoEncoder());
+            signalEndOfStream(mEncoderCore.getAudioEncoder());
+            mEncoderCore.release();
             Looper.myLooper().quit();
         });
     }
@@ -112,30 +110,34 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
         mEncoderHandler.post(r);
     }
 
-    public void commitVideoFrame(ByteBuffer buffer, long ptsUs) {
+    private void commitFrame(boolean isVideo, ByteBuffer buffer, long ptsUs) {
         if (!isHandlerReady()) {
             return;
         }
         mEncoderHandler.post(() -> {
-            if (BuildConfig.DEBUG) {
-                File file = saveBufferToFile(buffer, mVideoWidth, mVideoHeight, mEncoder.getOutputFile().getParentFile().toString());
+            MediaEncoderCore.Encoder encoder = isVideo ? mEncoderCore.getVideoEncoder() : mEncoderCore.getAudioEncoder();
+            if (encoder == null) {
+                return;
+            }
+            if (isVideo && false) {
+                File file = saveBufferToFile(buffer, mVideoWidth, mVideoHeight, mEncoderCore.getOutputFile().getParentFile().toString());
                 if (file != null) {
                     info("save to %s", file);
                 }
             }
-            mEncoder.drainVideoEncoder(false);
-            mEncoder.commitVideoFrame(buffer, ptsUs, false);
+            encoder.drainEncoder(false);
+            encoder.commitFrame(buffer, ptsUs, false);
         });
     }
 
-    public void commitAudioFrame(ByteBuffer buffer, long ptsUs) {
-        if (!isHandlerReady()) {
+    private void signalEndOfStream(MediaEncoderCore.Encoder encoder) {
+        if (encoder == null) {
             return;
         }
-        mEncoderHandler.post(() -> {
-            mEncoder.drainAudioEncoder(false);
-            mEncoder.commitAudioFrame(buffer, ptsUs, false);
-        });
+        encoder.drainEncoder(false);
+        // send endOfStream must with correct pts!!
+        encoder.commitFrame(null, encoder.getLastPts(), true);
+        encoder.drainEncoder(true);
     }
 
     @Override
@@ -143,13 +145,13 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
         mVideoFormat = format;
         mVideoWidth = width;
         mVideoHeight = height;
-        commitVideoFrame(buffer, (long) (pts * 1000 * 1000));
+        commitFrame(true, buffer, (long) (pts * 1000 * 1000));
     }
 
     @Override
     public void onAudioFrame(ByteBuffer buffer, double pts, int sampleRate, long channelLayout) {
         mAudioSampleRate = sampleRate;
         mAudioChannelLayout = channelLayout;
-        commitAudioFrame(buffer, (long) (pts * 1000 * 1000));
+        commitFrame(false, buffer, (long) (pts * 1000 * 1000));
     }
 }

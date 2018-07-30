@@ -333,6 +333,9 @@ typedef struct VideoState {
 #endif
     struct AudioParams audio_tgt;
     struct SwrContext *swr_ctx;
+    struct SwrContext *swr_ctx_recording;
+    jobject pixel_buffer;
+    jobject pcm_buffer;
     int frame_drops_early;
     int frame_drops_late;
     int continuous_frame_drops_early;
@@ -711,8 +714,6 @@ typedef struct FFPlayer {
     int skip_calc_frame_rate;
     int get_frame_mode;
     GetImgInfo *get_img_info;
-    jobject pixel_buffer;
-    jobject pcm_buffer;
 } FFPlayer;
 
 #define fftime_to_milliseconds(ts) (av_rescale(ts, 1000, AV_TIME_BASE))
@@ -773,8 +774,6 @@ inline static void ffp_reset_internal(FFPlayer *ffp)
     ffp->vout                   = NULL; /* reset outside */
     ffp->pipeline               = NULL;
     ffp->node_vdec              = NULL;
-    ffp->pixel_buffer           = NULL; /* reset outside */
-    ffp->pcm_buffer             = NULL; /* reset outside */
     ffp->sar_num                = 0;
     ffp->sar_den                = 0;
 
