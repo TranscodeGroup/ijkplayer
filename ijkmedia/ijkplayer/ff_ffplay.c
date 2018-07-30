@@ -910,6 +910,8 @@ static void video_image_display2(FFPlayer *ffp)
     }
 }
 
+static void ffp_buffer_free_p(jobject *buffer);
+
 // FFP_MERGE: compute_mod
 // FFP_MERGE: video_audio_display
 
@@ -930,6 +932,8 @@ static void stream_component_close(FFPlayer *ffp, int stream_index)
 
         decoder_destroy(&is->auddec);
         swr_free(&is->swr_ctx);
+        swr_free(&is->swr_ctx_recording);
+        ffp_buffer_free_p(&is->pcm_buffer);    
         av_freep(&is->audio_buf1);
         is->audio_buf1_size = 0;
         is->audio_buf = NULL;
@@ -946,6 +950,7 @@ static void stream_component_close(FFPlayer *ffp, int stream_index)
     case AVMEDIA_TYPE_VIDEO:
         decoder_abort(&is->viddec, &is->pictq);
         decoder_destroy(&is->viddec);
+        ffp_buffer_free_p(&is->pixel_buffer);
         break;
     case AVMEDIA_TYPE_SUBTITLE:
         decoder_abort(&is->subdec, &is->subpq);
@@ -1485,13 +1490,14 @@ static void alloc_picture(FFPlayer *ffp, int frame_format)
 static int send_frame_to_java2(FFPlayer *ffp, Frame *vp, AVFrame *frame)
 {
     // TGLOGI("send_frame_to_java");
+    VideoState *is = ffp->is;
     if (frame->format != AV_PIX_FMT_YUV420P) {
         TGLOGW("unsupported frame format %d", frame->format);
         return -1;
     }
     JNIEnv *env = NULL;
     if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
-        ALOGE("%s: SetupThreadEnv failed\n", __func__);
+        TGLOGE("%s: SetupThreadEnv failed\n", __func__);
         return -1;
     }
     jint total_size = 0;
@@ -1506,24 +1512,24 @@ static int send_frame_to_java2(FFPlayer *ffp, Frame *vp, AVFrame *frame)
         total_size += size;
         planes++;
     }
-    if (!ffp->pixel_buffer) {
+    if (!is->pixel_buffer) {
         TGLOGI("planes=%d, total_size=%d, format=%d, width=%d, height=%d", planes, total_size,
                frame->format, frame->width, frame->height);
-        ffp->pixel_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, total_size);
-        if (!ffp->pixel_buffer) {
+        is->pixel_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, total_size);
+        if (!is->pixel_buffer) {
             J4A_FUNC_FAIL_TRACE();
             return -1;
         }
     }
     // copy pixels to buffer
     // see: J4AC_ByteBuffer__assignData__catchAll
-    jobject tmp_buffer = J4AC_ByteBuffer__limit(env, ffp->pixel_buffer, total_size);
+    jobject tmp_buffer = J4AC_ByteBuffer__limit(env, is->pixel_buffer, total_size);
     if (J4A_ExceptionCheck__catchAll(env) || !tmp_buffer) {
         TGLOGW("exec pixel_buffer.limit(%d) failed. maybe size changed.", total_size);
         return -1;
     }
     J4A_DeleteLocalRef__p(env, &tmp_buffer);
-    uint8_t *c_buffer = J4AC_ByteBuffer__getDirectBufferAddress__catchAll(env, ffp->pixel_buffer);
+    uint8_t *c_buffer = J4AC_ByteBuffer__getDirectBufferAddress__catchAll(env, is->pixel_buffer);
     if (!c_buffer) {
         return -1;
     }
@@ -1535,7 +1541,7 @@ static int send_frame_to_java2(FFPlayer *ffp, Frame *vp, AVFrame *frame)
     }
     // vp->format and frame->format is frame format, vp->bmp->format is display format, them is diff!
     // vp->pts is double type, frame->pts is int64_t type, in here, we need double type.
-    IjkMediaPlayer_onVideoFrame__catchAll(env, ffp->inject_opaque, ffp->pixel_buffer, vp->pts,
+    IjkMediaPlayer_onVideoFrame__catchAll(env, ffp->inject_opaque, is->pixel_buffer, vp->pts,
                                           frame->format, frame->width, frame->height);
     return 0;
 }
@@ -1560,7 +1566,7 @@ static bool send_frame_to_java(FFPlayer *ffp, Frame *vp)
     // TGLOGI("send_frame_to_java");
     JNIEnv *env = NULL;
     if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
-        ALOGE("%s: SetupThreadEnv failed\n", __func__);
+        TGLOGE("%s: SetupThreadEnv failed\n", __func__);
         return -1;
     }
     SDL_VoutOverlay *bmp = vp->bmp;
@@ -1601,11 +1607,11 @@ static bool send_frame_to_java(FFPlayer *ffp, Frame *vp)
     return 0;
 }
 
-static void ffp_buffer_free_p(jobject *buffer);
 
 static int send_frame_to_java_audio(FFPlayer *ffp, Frame *af)
 {
     AVFrame *frame = af->frame;
+    VideoState *is = ffp->is;
     if (!(frame->channel_layout == AV_CH_LAYOUT_MONO || frame->channel_layout == AV_CH_LAYOUT_STEREO)
         || !(frame->format == AV_SAMPLE_FMT_S16 || frame->format == AV_SAMPLE_FMT_FLTP)) {
         TGLOGW("unsupported channel_layout: %ld, format: %d",
@@ -1614,59 +1620,94 @@ static int send_frame_to_java_audio(FFPlayer *ffp, Frame *af)
     }
     JNIEnv *env = NULL;
     if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
-        ALOGE("%s: SetupThreadEnv failed\n", __func__);
+        TGLOGE("%s: SetupThreadEnv failed\n", __func__);
         return -1;
     }
     // see: audio_decode_frame()/ff_ffplay.c
-    int data_size = av_samples_get_buffer_size(NULL, av_frame_get_channels(frame),
-                                               frame->nb_samples, frame->format, 1);
-    if (!ffp->pcm_buffer) {
-        TGLOGI("allocate pcm_buffer, %d", data_size);
-        ffp->pcm_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, data_size);
-        if (!ffp->pcm_buffer) {
+    enum AVSampleFormat pcm16 = AV_SAMPLE_FMT_S16; // only output PCM16
+    int buffer_size = av_samples_get_buffer_size(NULL, av_frame_get_channels(frame),
+                                                 frame->nb_samples, pcm16, 1);
+    if (buffer_size < 0) {
+        TGLOGE("av_samples_get_buffer_size() failed\n");
+        return -1;
+    }
+
+    // prepare buffer
+    if (!is->pcm_buffer) {
+        TGLOGI("allocate pcm_buffer, %d", buffer_size);
+        is->pcm_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, buffer_size);
+        if (!is->pcm_buffer) {
             J4A_FUNC_FAIL_TRACE();
             return -1;
         }
     } else {
-        jlong capacity = (*env)->GetDirectBufferCapacity(env, ffp->pcm_buffer);
-        if (capacity < data_size) {
-            TGLOGI("reallocate pcm_buffer, %d => %d", capacity, data_size);
-            ffp_buffer_free_p(&ffp->pcm_buffer);
-            ffp->pcm_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, data_size);
-            if (!ffp->pcm_buffer) {
+        jlong capacity = (*env)->GetDirectBufferCapacity(env, is->pcm_buffer);
+        if (capacity < buffer_size) {
+            TGLOGI("reallocate pcm_buffer, %d => %d", capacity, buffer_size);
+            ffp_buffer_free_p(&is->pcm_buffer);
+            is->pcm_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, buffer_size);
+            if (!is->pcm_buffer) {
                 J4A_FUNC_FAIL_TRACE();
                 return -1;
             }
         }
     }
-    jobject tmp_buffer = J4AC_ByteBuffer__limit(env, ffp->pcm_buffer, data_size);
+    uint8_t *c_buffer = J4AC_ByteBuffer__getDirectBufferAddress__catchAll(env, is->pcm_buffer);
+    if (!c_buffer) {
+        return -1;
+    }
+
+    int data_size;
+    if (frame->format != pcm16) {
+        // convert other format to pcm16
+        if (!is->swr_ctx_recording) {
+            is->swr_ctx_recording = swr_alloc_set_opts(
+                    NULL,
+                    frame->channel_layout, pcm16, frame->sample_rate,
+                    frame->channel_layout, frame->format, frame->sample_rate,
+                    0, NULL
+            );
+            if (!is->swr_ctx_recording) {
+                TGLOGE("tgtrack: Cannot [alloc] sample rate converter for recording");
+                return -1;
+            }
+            if (swr_init(is->swr_ctx_recording) < 0) {
+                TGLOGE("tgtrack: Cannot [init] sample rate converter for recording");
+                return -1;
+            }
+        }
+        uint8_t **out = &c_buffer;
+        const uint8_t **in = (const uint8_t **) frame->extended_data;
+        int len = swr_convert(is->swr_ctx_recording, out, frame->nb_samples, in, frame->nb_samples);
+        data_size = len * av_frame_get_channels(frame) * av_get_bytes_per_sample(pcm16);
+    } else {
+        data_size = buffer_size;
+        memcpy(c_buffer, frame->data[0], (size_t) data_size);
+    }
+
+    // limit buffer
+    jobject tmp_buffer = J4AC_ByteBuffer__limit(env, is->pcm_buffer, data_size);
     if (J4A_ExceptionCheck__catchAll(env) || !tmp_buffer) {
         TGLOGW("exec pcm_buffer.limit(%d) failed.", data_size);
         return -1;
     }
     J4A_DeleteLocalRef__p(env, &tmp_buffer);
-    void *c_buffer = J4AC_ByteBuffer__getDirectBufferAddress__catchAll(env, ffp->pcm_buffer);
-    if (!c_buffer) {
-        return -1;
-    }
-    uint8_t *bytes = frame->data[0];
-    // todo: fltp to s16 (https://stackoverflow.com/questions/14989397/how-to-convert-sample-rate-from-av-sample-fmt-fltp-to-av-sample-fmt-s16)
-    memcpy(c_buffer, bytes, (size_t) data_size);
 
-    IjkMediaPlayer_onAudioFrame__catchAll(env, ffp->inject_opaque, ffp->pcm_buffer, af->pts,
+    IjkMediaPlayer_onAudioFrame__catchAll(env, ffp->inject_opaque, is->pcm_buffer, af->pts,
                                           frame->sample_rate, frame->channel_layout);
 }
 
 static int send_frame_to_java3(FFPlayer *ffp, Frame *vp, AVFrame *frame)
 {
     // TGLOGI("send_frame_to_java");
+    VideoState *is = ffp->is;
     if (frame->format != AV_PIX_FMT_YUV420P) {
         TGLOGW("unsupported frame format %d", frame->format);
         return -1;
     }
     JNIEnv *env = NULL;
     if (JNI_OK != SDL_JNI_SetupThreadEnv(&env)) {
-        ALOGE("%s: SetupThreadEnv failed\n", __func__);
+        TGLOGE("%s: SetupThreadEnv failed\n", __func__);
         return -1;
     }
     jint total_size = 0;
@@ -1681,11 +1722,11 @@ static int send_frame_to_java3(FFPlayer *ffp, Frame *vp, AVFrame *frame)
         total_size += size;
         planes++;
     }
-    if (!ffp->pixel_buffer) {
+    if (!is->pixel_buffer) {
         TGLOGI("planes=%d, total_size=%d, format=%d, width=%d, height=%d", planes, total_size,
                frame->format, frame->width, frame->height);
-        ffp->pixel_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, total_size);
-        if (!ffp->pixel_buffer) {
+        is->pixel_buffer = J4AC_ByteBuffer__allocateDirect__asGlobalRef__catchAll(env, total_size);
+        if (!is->pixel_buffer) {
             J4A_FUNC_FAIL_TRACE();
             return -1;
         }
@@ -1696,13 +1737,13 @@ static int send_frame_to_java3(FFPlayer *ffp, Frame *vp, AVFrame *frame)
     for (int i = 0; i < planes; i++) {
         buffer_size += line_width[i] * line_height[i];
     }
-    jobject tmp_buffer = J4AC_ByteBuffer__limit(env, ffp->pixel_buffer, buffer_size);
+    jobject tmp_buffer = J4AC_ByteBuffer__limit(env, is->pixel_buffer, buffer_size);
     if (J4A_ExceptionCheck__catchAll(env) || !tmp_buffer) {
         TGLOGW("exec pixel_buffer.limit(%d) failed. maybe size changed.", buffer_size);
         return -1;
     }
     J4A_DeleteLocalRef__p(env, &tmp_buffer);
-    uint8_t *c_buffer = J4AC_ByteBuffer__getDirectBufferAddress__catchAll(env, ffp->pixel_buffer);
+    uint8_t *c_buffer = J4AC_ByteBuffer__getDirectBufferAddress__catchAll(env, is->pixel_buffer);
     if (!c_buffer) {
         return -1;
     }
@@ -1717,7 +1758,7 @@ static int send_frame_to_java3(FFPlayer *ffp, Frame *vp, AVFrame *frame)
     }
     // vp->format and frame->format is frame format, vp->bmp->format is display format, them is diff!
     // vp->pts is double type, frame->pts is int64_t type, in here, we need double type.
-    IjkMediaPlayer_onVideoFrame__catchAll(env, ffp->inject_opaque, ffp->pixel_buffer, vp->pts,
+    IjkMediaPlayer_onVideoFrame__catchAll(env, ffp->inject_opaque, is->pixel_buffer, vp->pts,
                                           frame->format, frame->width, frame->height);
     return 0;
 }
@@ -4151,8 +4192,6 @@ void ffp_destroy(FFPlayer *ffp)
     ffpipenode_free_p(&ffp->node_vdec);
     ffpipeline_free_p(&ffp->pipeline);
     ijkmeta_destroy_p(&ffp->meta);
-    ffp_buffer_free_p(&ffp->pixel_buffer);
-    ffp_buffer_free_p(&ffp->pcm_buffer);
     ffp_reset_internal(ffp);
 
     SDL_DestroyMutexP(&ffp->af_mutex);
