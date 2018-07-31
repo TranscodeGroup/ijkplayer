@@ -8,9 +8,9 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Locale;
 
-import tv.danmaku.ijk.media.example.BuildConfig;
 import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 
+import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.copyLimited;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.generateNowTime4File;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.saveBufferToFile;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.info;
@@ -112,16 +112,17 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
         mEncoderHandler.post(r);
     }
 
-    private void commitFrame(boolean isVideo, ByteBuffer buffer, long ptsUs) {
+    private void commitFrame(boolean isVideo, ByteBuffer c_buffer, long ptsUs) {
         if (!isHandlerReady()) {
             return;
         }
+        ByteBuffer buffer = copyLimited(c_buffer);
         mEncoderHandler.post(() -> {
             MediaEncoderCore.Encoder encoder = isVideo ? mEncoderCore.getVideoEncoder() : mEncoderCore.getAudioEncoder();
             if (encoder == null) {
                 return;
             }
-            if (true) {
+            if (false) {
                 File outputFile = mEncoderCore.getOutputFile();
                 File file = new File(outputFile.getParentFile(), isVideo
                         ? String.format(Locale.US, "%s_%sx%s.yuv", generateNowTime4File(false), mVideoWidth, mVideoHeight)
