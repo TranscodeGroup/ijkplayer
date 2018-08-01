@@ -113,6 +113,16 @@ public class IjkConstant {
         return false;
     }
 
+    /**
+     * copy [0, limit) to new ByteBuffer
+     */
+    public static ByteBuffer copyLimited(ByteBuffer src) {
+        src.rewind();
+        byte[] bytes = new byte[src.remaining()];
+        src.get(bytes);
+        return ByteBuffer.wrap(bytes);
+    }
+
     public static String generateNowTime4File(boolean withMs) {
         String template = "yyyyMMddHHmmss";
         if (withMs) {
