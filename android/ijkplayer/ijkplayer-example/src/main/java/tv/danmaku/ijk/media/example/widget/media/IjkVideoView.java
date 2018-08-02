@@ -45,9 +45,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
+import tv.danmaku.ijk.media.example.R;
+import tv.danmaku.ijk.media.example.application.Settings;
+import tv.danmaku.ijk.media.example.services.MediaPlayerService;
 import tv.danmaku.ijk.media.exo.IjkExoMediaPlayer;
 import tv.danmaku.ijk.media.player.AndroidMediaPlayer;
 import tv.danmaku.ijk.media.player.IMediaPlayer;
@@ -58,9 +59,6 @@ import tv.danmaku.ijk.media.player.misc.IMediaDataSource;
 import tv.danmaku.ijk.media.player.misc.IMediaFormat;
 import tv.danmaku.ijk.media.player.misc.ITrackInfo;
 import tv.danmaku.ijk.media.player.misc.IjkMediaFormat;
-import tv.danmaku.ijk.media.example.R;
-import tv.danmaku.ijk.media.example.application.Settings;
-import tv.danmaku.ijk.media.example.services.MediaPlayerService;
 
 public class IjkVideoView extends FrameLayout implements MediaController.MediaPlayerControl {
     private static String TAG = "IjkVideoView";
@@ -413,7 +411,7 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
     IMediaPlayer.OnPreparedListener mPreparedListener = new IMediaPlayer.OnPreparedListener() {
         public void onPrepared(IMediaPlayer mp) {
             mPrepareEndTime = System.currentTimeMillis();
-            mHudViewHolder.updateLoadCost(mPrepareEndTime - mPrepareStartTime);
+            if (mHudViewHolder != null) mHudViewHolder.updateLoadCost(mPrepareEndTime - mPrepareStartTime);
             mCurrentState = STATE_PREPARED;
 
             // Get the capabilities of the player for this stream
@@ -595,7 +593,7 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         @Override
         public void onSeekComplete(IMediaPlayer mp) {
             mSeekEndTime = System.currentTimeMillis();
-            mHudViewHolder.updateSeekCost(mSeekEndTime - mSeekStartTime);
+            if (mHudViewHolder != null) mHudViewHolder.updateSeekCost(mSeekEndTime - mSeekStartTime);
         }
     };
 
