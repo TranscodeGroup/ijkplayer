@@ -1715,11 +1715,10 @@ static int send_frame_to_java3(FFPlayer *ffp, Frame *vp, AVFrame *frame)
     int line_width[] = {frame->width, frame->width / 2, frame->width / 2}; // for yuv420p
     int line_height[] = {frame->height, frame->height / 2, frame->height / 2}; // for yuv420p
     for (int i = 0; i < AV_NUM_DATA_POINTERS; i++) {
-        int size = frame->linesize[i] * line_height[i];
-        if (size <= 0) {
+        if (frame->linesize[i] <= 0) {
             break;
         }
-        total_size += size;
+        total_size += frame->linesize[i] * line_height[i];
         planes++;
     }
     if (!is->pixel_buffer) {
