@@ -865,6 +865,7 @@ inline static void ffp_remove_msg(FFPlayer *ffp, int what) {
 
 inline static const char *ffp_get_error_string(int error) {
     switch (error) {
+        case AVERROR(EIO):          return "AVERROR(EIO)";       // 5
         case AVERROR(ENOMEM):       return "AVERROR(ENOMEM)";       // 12
         case AVERROR(EINVAL):       return "AVERROR(EINVAL)";       // 22
         case AVERROR(EAGAIN):       return "AVERROR(EAGAIN)";       // 35

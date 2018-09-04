@@ -197,7 +197,7 @@ static int ijklivehook_read_header(AVFormatContext *avf, AVDictionary **options)
     c->io_control.size = sizeof(c->io_control);
     strlcpy(c->io_control.url, inner_url, sizeof(c->io_control.url));
 
-    if (av_stristart(c->io_control.url, "rtmp", NULL) ||
+    if (/*av_stristart(c->io_control.url, "rtmp", NULL) ||*/
         av_stristart(c->io_control.url, "rtsp", NULL)) {
         // There is total different meaning for 'timeout' option in rtmp
         av_log(avf, AV_LOG_WARNING, "remove 'timeout' option for rtmp.\n");

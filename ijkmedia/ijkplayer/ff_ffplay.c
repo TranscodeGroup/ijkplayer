@@ -3304,7 +3304,7 @@ static int read_thread(void *arg)
         av_dict_set(&ffp->format_opts, "scan_all_pmts", "1", AV_DICT_DONT_OVERWRITE);
         scan_all_pmts_set = 1;
     }
-    if (av_stristart(is->filename, "rtmp", NULL) ||
+    if (/*av_stristart(is->filename, "rtmp", NULL) ||*/
         av_stristart(is->filename, "rtsp", NULL)) {
         // There is total different meaning for 'timeout' option in rtmp
         av_log(ffp, AV_LOG_WARNING, "remove 'timeout' option for rtmp.\n");
@@ -3733,7 +3733,7 @@ static int read_thread(void *arg)
                     packet_queue_put_nullpacket(&is->subtitleq, is->subtitle_stream);
                 is->eof = 1;
                 ffp->error = pb_error;
-                av_log(ffp, AV_LOG_ERROR, "av_read_frame error: %s\n", ffp_get_error_string(ffp->error));
+                av_log(ffp, AV_LOG_ERROR, "av_read_frame error: %s(%d)\n", ffp_get_error_string(ffp->error), ffp->error);
                 // break;
             } else {
                 ffp->error = 0;
@@ -4430,7 +4430,7 @@ int ffp_prepare_async_l(FFPlayer *ffp, const char *file_name)
     assert(!ffp->is);
     assert(file_name);
 
-    if (av_stristart(file_name, "rtmp", NULL) ||
+    if (/*av_stristart(file_name, "rtmp", NULL) ||*/
         av_stristart(file_name, "rtsp", NULL)) {
         // There is total different meaning for 'timeout' option in rtmp
         av_log(ffp, AV_LOG_WARNING, "remove 'timeout' option for rtmp.\n");
