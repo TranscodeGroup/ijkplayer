@@ -36,7 +36,7 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
     }
 
     @MainThread
-    public boolean startRecording(File outFile) {
+    public boolean startRecording(final File outFile) {
         if (mVideoFormat == IjkConstant.Format.INVALID) {
             warn("Video params(format/width/height) no ready");
             return false;
@@ -47,18 +47,21 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
                 return false;
             }
             mRunning = true;
-            new Thread(() -> {
-                Looper.prepare();
-                synchronized (mStateLock) {
-                    mEncoderHandler = new Handler();
-                    mHandlerReady = true;
-                    mStateLock.notifyAll();
-                }
-                Looper.loop();
-                info("Encoder thread exiting");
-                synchronized (mStateLock) {
-                    mHandlerReady = mRunning = false;
-                    mEncoderHandler = null;
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    Looper.prepare();
+                    synchronized (mStateLock) {
+                        mEncoderHandler = new Handler();
+                        mHandlerReady = true;
+                        mStateLock.notifyAll();
+                    }
+                    Looper.loop();
+                    info("Encoder thread exiting");
+                    synchronized (mStateLock) {
+                        mHandlerReady = mRunning = false;
+                        mEncoderHandler = null;
+                    }
                 }
             }, "MediaRecorder>Encoder Thread").start();
             while (!mHandlerReady) {
@@ -69,14 +72,17 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
                 }
             }
         }
-        mEncoderHandler.post(() -> {
-            try {
-                mEncoderCore = new MediaEncoderCore(true, true, outFile,
-                        mVideoWidth, mVideoHeight, 1_000_000, mVideoFormat,
-                        mAudioSampleRate, mAudioChannelLayout
-                );
-            } catch (Throwable e) {
-                throw new RuntimeException("init encoder failed!", e);
+        mEncoderHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    mEncoderCore = new MediaEncoderCore(true, true, outFile,
+                            mVideoWidth, mVideoHeight, 1_000_000, mVideoFormat,
+                            mAudioSampleRate, mAudioChannelLayout
+                    );
+                } catch (Throwable e) {
+                    throw new RuntimeException("init encoder failed!", e);
+                }
             }
         });
         return true;
@@ -84,11 +90,14 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
 
     @MainThread
     public void stopRecording() {
-        mEncoderHandler.post(() -> {
-            signalEndOfStream(mEncoderCore.getVideoEncoder());
-            signalEndOfStream(mEncoderCore.getAudioEncoder());
-            mEncoderCore.release();
-            Looper.myLooper().quit();
+        mEncoderHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                MediaRecorder.this.signalEndOfStream(mEncoderCore.getVideoEncoder());
+                MediaRecorder.this.signalEndOfStream(mEncoderCore.getAudioEncoder());
+                mEncoderCore.release();
+                Looper.myLooper().quit();
+            }
         });
     }
 
@@ -112,28 +121,31 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
         mEncoderHandler.post(r);
     }
 
-    private void commitFrame(boolean isVideo, ByteBuffer c_buffer, long ptsUs) {
+    private void commitFrame(final boolean isVideo, ByteBuffer c_buffer,final long ptsUs) {
         if (!isHandlerReady()) {
             return;
         }
-        ByteBuffer buffer = copyLimited(c_buffer);
-        mEncoderHandler.post(() -> {
-            MediaEncoderCore.Encoder encoder = isVideo ? mEncoderCore.getVideoEncoder() : mEncoderCore.getAudioEncoder();
-            if (encoder == null) {
-                return;
-            }
-            if (false) {
-                File outputFile = mEncoderCore.getOutputFile();
-                File file = new File(outputFile.getParentFile(), isVideo
-                        ? String.format(Locale.US, "%s_%sx%s.yuv", generateNowTime4File(false), mVideoWidth, mVideoHeight)
-                        : outputFile.getName().split("\\.")[0] + ".pcm");
-                boolean append = !isVideo;
-                if (saveBufferToFile(buffer, file, append)) {
-                    info("save to %s", file);
+        final ByteBuffer buffer = copyLimited(c_buffer);
+        mEncoderHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                MediaEncoderCore.Encoder encoder = isVideo ? mEncoderCore.getVideoEncoder() : mEncoderCore.getAudioEncoder();
+                if (encoder == null) {
+                    return;
                 }
+                if (false) {
+                    File outputFile = mEncoderCore.getOutputFile();
+                    File file = new File(outputFile.getParentFile(), isVideo
+                            ? String.format(Locale.US, "%s_%sx%s.yuv", generateNowTime4File(false), mVideoWidth, mVideoHeight)
+                            : outputFile.getName().split("\\.")[0] + ".pcm");
+                    boolean append = !isVideo;
+                    if (saveBufferToFile(buffer, file, append)) {
+                        info("save to %s", file);
+                    }
+                }
+                encoder.drainEncoder(false);
+                encoder.commitFrame(buffer, ptsUs, false);
             }
-            encoder.drainEncoder(false);
-            encoder.commitFrame(buffer, ptsUs, false);
         });
     }
 
