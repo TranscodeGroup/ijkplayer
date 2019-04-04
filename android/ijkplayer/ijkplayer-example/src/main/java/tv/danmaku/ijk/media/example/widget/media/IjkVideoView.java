@@ -49,7 +49,6 @@ import java.util.Map;
 import tv.danmaku.ijk.media.example.R;
 import tv.danmaku.ijk.media.example.application.Settings;
 import tv.danmaku.ijk.media.example.services.MediaPlayerService;
-import tv.danmaku.ijk.media.exo.IjkExoMediaPlayer;
 import tv.danmaku.ijk.media.player.AndroidMediaPlayer;
 import tv.danmaku.ijk.media.player.IMediaPlayer;
 import tv.danmaku.ijk.media.player.IjkMediaPlayer;
@@ -1021,8 +1020,11 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
 
         switch (playerType) {
             case Settings.PV_PLAYER__IjkExoMediaPlayer: {
-                IjkExoMediaPlayer IjkExoMediaPlayer = new IjkExoMediaPlayer(mAppContext);
-                mediaPlayer = IjkExoMediaPlayer;
+                try {
+                    mediaPlayer = (IMediaPlayer) Class.forName("tv.danmaku.ijk.media.exo.IjkExoMediaPlayer").getConstructor(Context.class).newInstance(mAppContext);
+                } catch (Exception e) {
+                    throw new RuntimeException("create IjkExoMediaPlayer failed.", e);
+                }
             }
             break;
             case Settings.PV_PLAYER__AndroidMediaPlayer: {
