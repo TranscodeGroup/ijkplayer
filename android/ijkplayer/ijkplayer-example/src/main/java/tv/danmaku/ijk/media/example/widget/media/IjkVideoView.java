@@ -21,11 +21,13 @@ import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v7.app.AlertDialog;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -33,6 +35,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.TextureView;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.MediaController;
@@ -1037,7 +1040,7 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
                 IjkMediaPlayer ijkMediaPlayer = null;
                 if (mUri != null) {
                     ijkMediaPlayer = new IjkMediaPlayer();
-                    ijkMediaPlayer.native_setLogLevel(IjkMediaPlayer.IJK_LOG_DEBUG);
+                    ijkMediaPlayer.native_setLogLevel(mSettings.getLogLevel());
 
                     if (mSettings.getUsingMediaCodec()) {
                         ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1);
@@ -1276,5 +1279,19 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         } else {
             Log.w(TAG_TG, "mMediaPlayer isn't IjkMediaPlayer, nonsupport setOnFrameAvailableListener");
         }
+    }
+
+    @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
+    public void snapshot(OnSnapshotResultCallback callback) {
+        if (mRenderView != null && mRenderView.getView() instanceof TextureView) {
+            TextureView view = (TextureView) mRenderView.getView();
+            callback.onSnapshotResult(view.getBitmap());
+        } else {
+            callback.onSnapshotResult(null);
+        }
+    }
+
+    public interface OnSnapshotResultCallback {
+        void onSnapshotResult(@Nullable Bitmap bitmap);
     }
 }
