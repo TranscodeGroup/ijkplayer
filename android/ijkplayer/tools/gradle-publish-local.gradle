@@ -1,7 +1,7 @@
 apply plugin: 'com.github.dcendents.android-maven'
 
 group = 'cn.transcodegroup.ijkplayer'
-version = "$VERSION_NAME.11"
+version = "$VERSION_NAME.12"
 
 task androidJavadocs(type: Javadoc) {
     failOnError false

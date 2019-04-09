@@ -25,6 +25,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentTransaction;
 import android.support.v4.widget.DrawerLayout;
@@ -42,17 +43,17 @@ import android.widget.TextView;
 import java.io.File;
 import java.util.Locale;
 
-import tv.danmaku.ijk.media.example.widget.media.IjkConstant;
-import tv.danmaku.ijk.media.example.widget.media.MediaRecorder;
-import tv.danmaku.ijk.media.player.IjkMediaPlayer;
-import tv.danmaku.ijk.media.player.misc.ITrackInfo;
 import tv.danmaku.ijk.media.example.R;
 import tv.danmaku.ijk.media.example.application.Settings;
 import tv.danmaku.ijk.media.example.content.RecentMediaStorage;
 import tv.danmaku.ijk.media.example.fragments.TracksFragment;
 import tv.danmaku.ijk.media.example.widget.media.AndroidMediaController;
+import tv.danmaku.ijk.media.example.widget.media.IjkConstant;
 import tv.danmaku.ijk.media.example.widget.media.IjkVideoView;
 import tv.danmaku.ijk.media.example.widget.media.MeasureHelper;
+import tv.danmaku.ijk.media.example.widget.media.MediaRecorder;
+import tv.danmaku.ijk.media.player.IjkMediaPlayer;
+import tv.danmaku.ijk.media.player.misc.ITrackInfo;
 
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.toast;
 
@@ -133,7 +134,7 @@ public class VideoActivity extends AppCompatActivity implements TracksFragment.I
 
         ActionBar actionBar = getSupportActionBar();
         mMediaController = new AndroidMediaController(this, false);
-        mMediaController.setSupportActionBar(actionBar);
+        // mMediaController.setSupportActionBar(actionBar);
 
         mToastTextView = (TextView) findViewById(R.id.toast_text_view);
         mHudView = (TableLayout) findViewById(R.id.hud_view);
@@ -231,11 +232,43 @@ public class VideoActivity extends AppCompatActivity implements TracksFragment.I
             }
         } else if (id == R.id.action_toggle_recording) {
             if (!mMediaRecorder.isRecording()) {
-                boolean success = mMediaRecorder.startRecording(new File(Environment.getExternalStorageDirectory(),
-                        String.format(Locale.US, "ijkplayer/%s/media.mp4", IjkConstant.generateNowTime4File(false))));
-                if (!success) {
-                    toast(this, "startRecording failed!");
-                }
+                mMediaRecorder.startRecording(
+                        new File(Environment.getExternalStorageDirectory(), String.format(Locale.US, "ijkplayer/%s/media.mp4", IjkConstant.generateNowTime4File(false))),
+                        new MediaRecorder.Callback() {
+                            @Override
+                            public void onStarted(MediaRecorder.EncodeThread thread) {
+                                Log.d(TAG, "onStarted() called with: thread = [" + thread + "]");
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        toast(VideoActivity.this, "onStarted");
+                                    }
+                                });
+                            }
+
+                            @Override
+                            public void onFailed(@Nullable MediaRecorder.EncodeThread thread, final Exception e) {
+                                Log.d(TAG, "onFailed() called with: thread = [" + thread + "], e = [" + e + "]");
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        toast(VideoActivity.this, "onFailed: %s", e);
+                                    }
+                                });
+                            }
+
+                            @Override
+                            public void onCompleted(MediaRecorder.EncodeThread thread, final boolean reasonIsFormatChanged) {
+                                Log.d(TAG, "onCompleted() called with: thread = [" + thread + "], reasonIsFormatChanged = [" + reasonIsFormatChanged + "]");
+                                runOnUiThread(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        toast(VideoActivity.this, "onCompleted: %s", reasonIsFormatChanged);
+                                    }
+                                });
+                            }
+                        }
+                );
             } else {
                 mMediaRecorder.stopRecording();
             }
