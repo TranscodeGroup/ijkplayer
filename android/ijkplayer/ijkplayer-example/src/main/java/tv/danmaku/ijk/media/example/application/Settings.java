@@ -113,11 +113,20 @@ public class Settings {
         mSharedPreferences.edit().putString(key, path).apply();
     }
 
-    public void setLogLevel(int level){
+    public int getLogLevel() {
+        return mSharedPreferences.getInt("pref.log_level", IjkMediaPlayer.IJK_LOG_WARN);
+    }
+
+    public void setLogLevel(int level) {
         mSharedPreferences.edit().putInt("pref.log_level", level).apply();
     }
 
-    public int getLogLevel(){
-        return mSharedPreferences.getInt("pref.log_level", IjkMediaPlayer.IJK_LOG_WARN);
+    public int getMinFrames() {
+        return mSharedPreferences.getInt("pref.min-frames", -1);
+    }
+
+    /** The minimum number of frames for video buffering, the minimum is 2 */
+    public void setMinFrames(int value) {
+        mSharedPreferences.edit().putInt("pref.min-frames", value).apply();
     }
 }
