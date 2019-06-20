@@ -29,6 +29,9 @@ import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.convertPixel
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.convertToChannelMask;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.info;
 
+/**
+ * @see com.android.grafika.VideoEncoderCore
+ */
 @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
 public class MediaEncoderCore {
     private static final String MIMETYPE_VIDEO_AVC = "video/avc";

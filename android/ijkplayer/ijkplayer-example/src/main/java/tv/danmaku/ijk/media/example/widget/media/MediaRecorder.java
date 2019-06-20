@@ -17,6 +17,9 @@ import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.info;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.saveBufferToFile;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.warn;
 
+/**
+ * @see com.android.grafika.TextureMovieEncoder2
+ */
 public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
 
     private final Formats mFormats = new Formats();
