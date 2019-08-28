@@ -1,20 +1,23 @@
 package tv.danmaku.ijk.media.example.widget.media;
 
+import android.media.ThumbnailUtils;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
+import android.provider.MediaStore;
 import android.support.annotation.Nullable;
 
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Locale;
 
+import tv.danmaku.ijk.media.example.BuildConfig;
 import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.copyLimited;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.generateNowTime4File;
-import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.info;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.saveBufferToFile;
+import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.verbose;
 import static tv.danmaku.ijk.media.example.widget.media.IjkConstant.warn;
 
 /**
@@ -88,7 +91,7 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
         private final Handler mHandler;
         private final File mOutFile;
         private final Formats mFormats;
-        private Callback mCallback;
+        private final Callback mCallback;
         private MediaEncoderCore mEncoderCore;
         private volatile boolean mFormatChanged = false;
 
@@ -121,16 +124,28 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
                         if (error == null) {
                             error = e;
                         } else {
-                            warn("double exception(%s, %s), this second be discard...", error, e);
+                            warn("double exception(%s, %s), this second exception be discard...", error, e);
                         }
                     }
                 }
             }
 
+            if (BuildConfig.DEBUG) {
+                verbose("mOutFile.length(): %s, outputDataCount: %s, thumbnail: %s",
+                        mOutFile.length(),
+                        // when failed, generally, outDataCount < 10
+                        mEncoderCore != null ? mEncoderCore.getOutputDataCount() : -1,
+                        // when failed, generally, thumbnail is null
+                        ThumbnailUtils.createVideoThumbnail(mOutFile.getPath(), MediaStore.Images.Thumbnails.MINI_KIND)
+                );
+            }
             if (error != null) {
-                // delete file when error
+                // delete file when failed
                 if (mOutFile.exists()) {
                     mOutFile.delete();
+                }
+                if (error instanceof IllegalStateException && mEncoderCore != null && mEncoderCore.getOutputDataCount() < MediaEncoderCore.MIN_OUTPUT_DATA_COUNT) {
+                    error = new EncodeException.OutputDataTooLittle(error);
                 }
                 mCallback.onFailed(this, error);
             } else {
@@ -154,7 +169,7 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
                                 : outputFile.getName().split("\\.")[0] + ".pcm");
                         boolean append = !isVideo;
                         if (saveBufferToFile(buffer, file, append)) {
-                            info("save to %s", file);
+                            verbose("save to %s", file);
                         }
                     }
                     encoder.drainEncoder(false);
@@ -168,8 +183,23 @@ public class MediaRecorder implements IjkMediaPlayer.OnFrameAvailableListener {
                 return;
             }
             encoder.drainEncoder(false);
-            // send endOfStream must with correct pts!!
-            encoder.commitFrame(null, encoder.getLastPts(), true);
+            int retryCount = 0;
+            while (true) {
+                // send endOfStream must with correct pts!!
+                boolean committed = encoder.commitFrame(null, encoder.computeEndOfStreamPts(), true);
+                if (committed) {
+                    break;
+                }
+                if (retryCount++ < 100) { // retry 100 times until success...
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    throw new EncodeException.EndOfStreamFailed("signal end Of Stream failed.");
+                }
+            }
             encoder.drainEncoder(true);
         }
 

@@ -39,13 +39,17 @@ public class MediaEncoderCore {
     private static final int VIDEO_FPS = 30;
     private static final int VIDEO_GOP = 150;
     private static final int VIDEO_I_FRAME_INTERVAL = VIDEO_GOP / VIDEO_FPS;
+    public static final int MIN_OUTPUT_DATA_COUNT = VIDEO_FPS;
+    private static final int BYTE_SIZE_PCM_16BIT = 2;
+    private static final long TIMEOUT_DEQUEUE_BUFFER_USEC = 10_000; // 10ms
+    public static final long MAX_WAIT_TO_END_COUNT = 10_000 / (TIMEOUT_DEQUEUE_BUFFER_USEC / 1000); // wait 10s
     @Nullable
     private Encoder mVideoEncoder;
     @Nullable
     private Encoder mAudioEncoder;
     private MediaMuxer mMuxer;
+    private long mOutputDataCount = 0;
     private boolean mMuxerStarted = false;
-    private static final long TIMEOUT_DEQUEUE_BUFFER_USEC = 10_000; // 10ms
     private File mOutputFile;
     private static MediaCodecInfo[] sAvailableAvcCodecs;
 
@@ -113,6 +117,7 @@ public class MediaEncoderCore {
             format.setInteger(MediaFormat.KEY_FRAME_RATE, VIDEO_FPS);
             format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, VIDEO_I_FRAME_INTERVAL);
             info("video format: %s", format);
+            mVideoEncoder.inputFormat = format;
             mVideoEncoder.encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
             mVideoEncoder.encoder.start();
         }
@@ -135,6 +140,7 @@ public class MediaEncoderCore {
             // audioFormat.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
             audioFormat.setInteger(MediaFormat.KEY_BIT_RATE, 128000);
             info("audio format: %s", audioFormat);
+            mAudioEncoder.inputFormat = audioFormat;
             mAudioEncoder.encoder = MediaCodec.createEncoderByType(MIMETYPE_AUDIO_AAC);
             mAudioEncoder.encoder.configure(audioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
             mAudioEncoder.encoder.start();
@@ -221,12 +227,22 @@ public class MediaEncoderCore {
         return mOutputFile;
     }
 
+    public long getOutputDataCount() {
+        return mOutputDataCount;
+    }
+
     public class Encoder {
         MediaCodec encoder;
+        MediaFormat inputFormat;
         MediaFormat outputFormat;
         int trackIndex = -1;
         long ptsOffset = 0;
-        long lastPts = 0;
+        private long lastPts = 0;
+        private int lastSize = 0;
+
+        public Encoder() {
+        }
+
         MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
 
         public void release() {
@@ -249,11 +265,25 @@ public class MediaEncoderCore {
             IjkConstant.warn(encoder.getName() + ": " + format, args);
         }
 
-        public long getLastPts() {
+        private void verbose(String format, Object... args) {
+            IjkConstant.verbose(encoder.getName() + ": " + format, args);
+        }
+
+        public long computeEndOfStreamPts() {
+            if (MIMETYPE_AUDIO_AAC.equals(inputFormat.getString(MediaFormat.KEY_MIME))) {
+                // for audio, we need to compute pts of the end, otherwise it will report "E/MPEG4Writer﹕timestampUs xxx < lastTimestampUs yyy for Audio track"
+                // see: https://stackoverflow.com/questions/18857692/muxing-aac-audio-with-androids-mediacodec-and-mediamuxer
+                int sampleRate = inputFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE);
+                int channelCount = inputFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT);
+                return lastPts + 1_000_000 * lastSize / (sampleRate * channelCount * BYTE_SIZE_PCM_16BIT);
+            }
             return lastPts;
         }
 
-        public void commitFrame(ByteBuffer buffer, long ptsUs, boolean endOfStream) {
+        /**
+         * @return Whether commitFrame was successful.
+         */
+        public boolean commitFrame(ByteBuffer buffer, long ptsUs, boolean endOfStream) {
             ByteBuffer[] inputBuffers = encoder.getInputBuffers();
             int index = encoder.dequeueInputBuffer(TIMEOUT_DEQUEUE_BUFFER_USEC);
             if (index >= 0) {
@@ -266,10 +296,14 @@ public class MediaEncoderCore {
                     int size = buffer.rewind().remaining(); // in jni, have not reset position to 0, so we need to rewind().
                     inputBuffer.put(buffer);
                     encoder.queueInputBuffer(index, offset, size, ptsUs, 0);
-                    info("submitted frame to encoder, size=%s, ptsUs=%s", size, ptsUs);
+                    lastPts = ptsUs;
+                    lastSize = size;
+                    verbose("submitted frame to encoder, size=%s, ptsUs=%s", size, ptsUs);
                 }
+                return true;
             } else {
                 warn("input buffer not available");
+                return false;
             }
         }
 
@@ -283,13 +317,19 @@ public class MediaEncoderCore {
                 info("waitToEnd is true");
             }
             ByteBuffer[] outputBuffers = this.encoder.getOutputBuffers();
+            long waitToEndCount = 0;
             while (true) {
                 int index = this.encoder.dequeueOutputBuffer(this.bufferInfo, TIMEOUT_DEQUEUE_BUFFER_USEC);
                 if (index == MediaCodec.INFO_TRY_AGAIN_LATER) {
                     if (!waitToEnd) {
                         break;
                     } else {
-                        info("wait to end");
+                        waitToEndCount++;
+                        info("wait to end(%s)", waitToEndCount);
+                        // prevent infinite loop. in theory, it is impossible....
+                        if (waitToEndCount > MAX_WAIT_TO_END_COUNT) {
+                            throw new EncodeException.EndOfStreamFailed("wait to end too long.");
+                        }
                     }
                 } else if (index == MediaCodec.INFO_OUTPUT_BUFFERS_CHANGED) {
                     outputBuffers = this.encoder.getOutputBuffers();
@@ -326,9 +366,9 @@ public class MediaEncoderCore {
                         // adjust buffer to match bufferInfo
                         buffer.position(this.bufferInfo.offset);
                         buffer.limit(this.bufferInfo.offset + this.bufferInfo.size);
+                        mOutputDataCount++;
                         mMuxer.writeSampleData(this.trackIndex, buffer, this.bufferInfo);
-                        info("sent %s bytes to muxer on %s", this.bufferInfo.size, this.bufferInfo.presentationTimeUs);
-                        lastPts = this.bufferInfo.presentationTimeUs;
+                        verbose("sent %s bytes to muxer on %s", this.bufferInfo.size, this.bufferInfo.presentationTimeUs);
                     }
                     this.encoder.releaseOutputBuffer(index, false);
                     if ((this.bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {

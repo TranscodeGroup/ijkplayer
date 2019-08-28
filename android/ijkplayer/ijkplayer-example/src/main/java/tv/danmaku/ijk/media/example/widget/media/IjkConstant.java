@@ -143,6 +143,10 @@ public class IjkConstant {
         Log.i(TAG, String.format(Locale.getDefault(), format, args));
     }
 
+    public static void verbose(String format, Object... args) {
+        Log.v(TAG, String.format(Locale.getDefault(), format, args));
+    }
+
     public static void warn(String format, Object... args) {
         Log.w(TAG, String.format(Locale.getDefault(), format, args));
     }
