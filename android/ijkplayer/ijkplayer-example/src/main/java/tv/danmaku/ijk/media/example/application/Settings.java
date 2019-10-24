@@ -22,6 +22,7 @@ import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
 
 import tv.danmaku.ijk.media.example.R;
+import tv.danmaku.ijk.media.player.IjkMediaPlayer;
 
 public class Settings {
     private Context mAppContext;
@@ -110,5 +111,22 @@ public class Settings {
     public void setLastDirectory(String path) {
         String key = mAppContext.getString(R.string.pref_key_last_directory);
         mSharedPreferences.edit().putString(key, path).apply();
+    }
+
+    public int getLogLevel() {
+        return mSharedPreferences.getInt("pref.log_level", IjkMediaPlayer.IJK_LOG_WARN);
+    }
+
+    public void setLogLevel(int level) {
+        mSharedPreferences.edit().putInt("pref.log_level", level).apply();
+    }
+
+    public int getMinFrames() {
+        return mSharedPreferences.getInt("pref.min-frames", -1);
+    }
+
+    /** The minimum number of frames for video buffering, the minimum is 2 */
+    public void setMinFrames(int value) {
+        mSharedPreferences.edit().putInt("pref.min-frames", value).apply();
     }
 }

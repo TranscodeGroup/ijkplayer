@@ -1,7 +1,7 @@
 apply plugin: 'com.github.dcendents.android-maven'
 
 group = 'cn.transcodegroup.ijkplayer'
-version = "$VERSION_NAME.8"
+version = "$VERSION_NAME.16"
 
 task androidJavadocs(type: Javadoc) {
     failOnError false
@@ -24,3 +24,14 @@ artifacts {
     archives androidJavadocsJar
 }
 
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            repository(url: rootProject.file("../../../MavenRepository").toURI())
+        }
+    }
+}
+
+task uploadArchivesToMaven(dependsOn: uploadArchives) {
+    // pass
+}

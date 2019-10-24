@@ -21,11 +21,13 @@ import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Build;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v7.app.AlertDialog;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -33,6 +35,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
+import android.view.TextureView;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.MediaController;
@@ -49,7 +52,6 @@ import java.util.Map;
 import tv.danmaku.ijk.media.example.R;
 import tv.danmaku.ijk.media.example.application.Settings;
 import tv.danmaku.ijk.media.example.services.MediaPlayerService;
-import tv.danmaku.ijk.media.exo.IjkExoMediaPlayer;
 import tv.danmaku.ijk.media.player.AndroidMediaPlayer;
 import tv.danmaku.ijk.media.player.IMediaPlayer;
 import tv.danmaku.ijk.media.player.IjkMediaPlayer;
@@ -927,6 +929,22 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         return mCurrentAspectRatio;
     }
 
+    /**
+     * @see IRenderView#AR_ASPECT_FIT_PARENT
+     * @see IRenderView#AR_16_9_FIT_PARENT
+     * @see IRenderView#AR_4_3_FIT_PARENT
+     */
+    public void setAspectRatio(int aspectRatio) {
+        if (mCurrentAspectRatio == aspectRatio) {
+            return;
+        }
+        mCurrentAspectRatioIndex = -1; // reset index
+        mCurrentAspectRatio = aspectRatio;
+        if (mRenderView != null) {
+            mRenderView.setAspectRatio(mCurrentAspectRatio);
+        }
+    }
+
     //-------------------------
     // Extend: Render
     //-------------------------
@@ -1021,8 +1039,11 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
 
         switch (playerType) {
             case Settings.PV_PLAYER__IjkExoMediaPlayer: {
-                IjkExoMediaPlayer IjkExoMediaPlayer = new IjkExoMediaPlayer(mAppContext);
-                mediaPlayer = IjkExoMediaPlayer;
+                try {
+                    mediaPlayer = (IMediaPlayer) Class.forName("tv.danmaku.ijk.media.exo.IjkExoMediaPlayer").getConstructor(Context.class).newInstance(mAppContext);
+                } catch (Exception e) {
+                    throw new RuntimeException("create IjkExoMediaPlayer failed.", e);
+                }
             }
             break;
             case Settings.PV_PLAYER__AndroidMediaPlayer: {
@@ -1035,7 +1056,7 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
                 IjkMediaPlayer ijkMediaPlayer = null;
                 if (mUri != null) {
                     ijkMediaPlayer = new IjkMediaPlayer();
-                    ijkMediaPlayer.native_setLogLevel(IjkMediaPlayer.IJK_LOG_DEBUG);
+                    ijkMediaPlayer.native_setLogLevel(mSettings.getLogLevel());
 
                     if (mSettings.getUsingMediaCodec()) {
                         ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1);
@@ -1064,6 +1085,10 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
                         ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "overlay-format", IjkMediaPlayer.SDL_FCC_RV32);
                     } else {
                         ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "overlay-format", pixelFormat);
+                    }
+                    int minFrames = mSettings.getMinFrames();
+                    if (minFrames != -1) {
+                        ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "min-frames", minFrames);
                     }
                     ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "framedrop", 1);
                     ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "start-on-prepared", 0);
@@ -1274,5 +1299,19 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         } else {
             Log.w(TAG_TG, "mMediaPlayer isn't IjkMediaPlayer, nonsupport setOnFrameAvailableListener");
         }
+    }
+
+    @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
+    public void snapshot(OnSnapshotResultCallback callback) {
+        if (mRenderView != null && mRenderView.getView() instanceof TextureView) {
+            TextureView view = (TextureView) mRenderView.getView();
+            callback.onSnapshotResult(view.getBitmap());
+        } else {
+            callback.onSnapshotResult(null);
+        }
+    }
+
+    public interface OnSnapshotResultCallback {
+        void onSnapshotResult(@Nullable Bitmap bitmap);
     }
 }
