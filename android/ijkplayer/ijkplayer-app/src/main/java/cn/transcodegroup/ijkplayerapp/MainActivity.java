@@ -38,8 +38,10 @@ public class MainActivity extends AppCompatActivity {
                     .commit();
         }
 
-        videoView.setVideoPath("http://192.240.127.34:1935/live/cs19.stream/play.m3u8");
+        videoView.setVideoPath("http://192.240.127.34:1935/live/cs19.stream/play.m3u8"); // yuvj420p
+//        videoView.setVideoPath("http://devimages.apple.com.edgekey.net/streaming/examples/bipbop_4x3/gear1/prog_index.m3u8"); // yuv420p
         videoView.start();
+        videoView.setKeepScreenOn(true);
         mMediaRecorder = new MediaRecorder(videoView);
     }
 

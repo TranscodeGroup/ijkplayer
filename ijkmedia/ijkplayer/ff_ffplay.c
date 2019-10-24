@@ -1701,7 +1701,7 @@ static int send_frame_to_java3(FFPlayer *ffp, Frame *vp, AVFrame *frame)
 {
     // TGLOGI("send_frame_to_java");
     VideoState *is = ffp->is;
-    if (frame->format != AV_PIX_FMT_YUV420P) {
+    if (frame->format != AV_PIX_FMT_YUV420P && frame->format != AV_PIX_FMT_YUVJ420P) {
         TGLOGW("unsupported frame format %d", frame->format);
         return -1;
     }
