@@ -6,5 +6,11 @@ include ':ijkplayer-armv7a'
 include ':ijkplayer-java'
 include ':ijkplayer-exo'
 
-include ':ijkplayer-example'
+if (isModuleAsApp.toBoolean()) {
+    include ':ijkplayer-example'
+} else {
+    include ':ijkplayer-app'
+    include ':ijkplayer-view'
+    project(':ijkplayer-view').projectDir = file('ijkplayer-example')
+}
 

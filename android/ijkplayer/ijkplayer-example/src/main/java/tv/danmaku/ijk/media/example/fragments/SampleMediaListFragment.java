@@ -68,7 +68,7 @@ public class SampleMediaListFragment extends Fragment {
             }
         });
 
-        mAdapter.addItem("rtmp://live.hkstv.hk.lxdns.com/live/hks", "HKS");
+        mAdapter.addItem("http://192.240.127.34:1935/live/cs19.stream/play.m3u8", "JP Anime");
         mAdapter.addItem("http://devimages.apple.com.edgekey.net/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8", "bipbop basic master playlist");
         mAdapter.addItem("http://devimages.apple.com.edgekey.net/streaming/examples/bipbop_4x3/gear1/prog_index.m3u8", "bipbop basic 400x300 @ 232 kbps");
         mAdapter.addItem("http://devimages.apple.com.edgekey.net/streaming/examples/bipbop_4x3/gear2/prog_index.m3u8", "bipbop basic 640x480 @ 650 kbps");
