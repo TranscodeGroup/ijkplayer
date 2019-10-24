@@ -42,10 +42,13 @@ public class IjkConstant {
 
     static {
         sPixelFormatToColorFormatLegacy.put(PixelFormat.AV_PIX_FMT_YUV420P, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar);
+        sPixelFormatToColorFormatLegacy.put(PixelFormat.AV_PIX_FMT_YUVJ420P, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar);
         if (api21()) {
             sPixelFormatToColorFormatAuto.put(PixelFormat.AV_PIX_FMT_YUV420P, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
+            sPixelFormatToColorFormatAuto.put(PixelFormat.AV_PIX_FMT_YUVJ420P, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible);
         } else {
             sPixelFormatToColorFormatAuto.put(PixelFormat.AV_PIX_FMT_YUV420P, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar);
+            sPixelFormatToColorFormatAuto.put(PixelFormat.AV_PIX_FMT_YUVJ420P, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar);
         }
 
         sPixelFormatToColorFormatLegacy.put(PixelFormat.AV_PIX_FMT_YUV422P, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV422Planar);
