@@ -1,5 +1,7 @@
-apply plugin: 'com.github.dcendents.android-maven'
+apply plugin: 'maven-publish'
 
+// Perform `publishReleasePublicationToLocalRepository` to publish aar to `MavenRepository` folder
+// @see https://gist.github.com/Robyer/a6578e60127418b380ca133a1291f017
 group = 'cn.transcodegroup.ijkplayer'
 version = "$VERSION_NAME.17"
 
@@ -7,31 +9,39 @@ task androidJavadocs(type: Javadoc) {
     failOnError false
     source = android.sourceSets.main.java.srcDirs
     classpath += project.files(android.getBootClasspath().join(File.pathSeparator))
+    android.libraryVariants.all { variant ->
+        if (variant.name == 'release') {
+            owner.classpath += variant.javaCompileProvider.get().classpath
+        }
+    }
+    exclude '**/R.html', '**/R.*.html', '**/index.html'
 }
 
 task androidJavadocsJar(type: Jar, dependsOn: androidJavadocs) {
-    classifier = 'javadoc'
+    archiveClassifier.set('javadoc')
     from androidJavadocs.destinationDir
 }
 
 task androidSourcesJar(type: Jar) {
-    classifier = 'sources'
-    from android.sourceSets.main.java.sourceFiles
+    archiveClassifier.set('sources')
+    from android.sourceSets.main.java.srcDirs
 }
 
-artifacts {
-    archives androidSourcesJar
-    archives androidJavadocsJar
-}
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
 
-uploadArchives {
-    repositories {
-        mavenDeployer {
-            repository(url: rootProject.file("../../../MavenRepository").toURI())
+                artifact androidJavadocsJar
+                artifact androidSourcesJar
+            }
+        }
+        repositories {
+            maven {
+                name = 'local'
+                url = rootProject.file("../../../MavenRepository").toURI()
+            }
         }
     }
-}
-
-task uploadArchivesToMaven(dependsOn: uploadArchives) {
-    // pass
 }
