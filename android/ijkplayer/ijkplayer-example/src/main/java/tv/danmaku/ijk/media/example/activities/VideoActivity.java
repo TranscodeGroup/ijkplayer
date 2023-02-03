@@ -233,7 +233,7 @@ public class VideoActivity extends AppCompatActivity implements TracksFragment.I
         } else if (id == R.id.action_toggle_recording) {
             if (!mMediaRecorder.isRecording()) {
                 mMediaRecorder.startRecording(
-                        new File(Environment.getExternalStorageDirectory(), String.format(Locale.US, "ijkplayer/%s/media.mp4", IjkConstant.generateNowTime4File(false))),
+                        new File(getExternalCacheDir(), String.format(Locale.US, "ijkplayer/%s/media.mp4", IjkConstant.generateNowTime4File(false))),
                         new MediaRecorder.Callback() {
                             @Override
                             public void onStarted(MediaRecorder.EncodeThread thread) {
