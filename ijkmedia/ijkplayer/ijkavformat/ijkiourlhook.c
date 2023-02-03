@@ -45,7 +45,6 @@ typedef struct Context {
     int             segment_index;
     int64_t         test_fail_point;
     int64_t         test_fail_point_next;
-    int64_t         app_ctx_intptr;
     int             abort_request;
     AVApplicationContext *app_ctx;
     IjkIOApplicationContext *ijkio_app_ctx;
@@ -175,7 +174,7 @@ static int ijkio_urlhook_init(IjkURLContext *h, const char *arg, int flags, IjkA
     if (options)
         ijk_av_dict_copy(&c->inner_options, *options, 0);
 
-    ijk_av_dict_set_int(&c->inner_options, "ijkapplication", c->app_ctx_intptr, 0);
+    ijk_av_dict_set_intptr(&c->inner_options, "ijkapplication", (uintptr_t )c->app_ctx, 0);
     ijk_av_dict_set_int(&c->inner_options, "ijkinject-segment-index", c->segment_index, 0);
 
     c->app_io_ctrl.size = sizeof(c->app_io_ctrl);
@@ -266,11 +265,9 @@ static int ijkio_httphook_open(IjkURLContext *h, const char *arg, int flags, Ijk
     c->ijkio_app_ctx = h->ijkio_app_ctx;
     c->ijkio_interrupt_callback = h->ijkio_app_ctx->ijkio_interrupt_callback;
 
-    t = ijk_av_dict_get(*options, "ijkapplication", NULL, IJK_AV_DICT_MATCH_CASE);
-    if (t) {
-        c->app_ctx_intptr = (int64_t)strtoll(t->value, NULL, 10);
-        c->app_ctx = (AVApplicationContext *)(intptr_t)c->app_ctx_intptr;
-    } else {
+    c->app_ctx = (AVApplicationContext *)ijk_av_dict_get_intptr(*options, "ijkapplication");
+
+    if (!c->app_ctx) {
         goto fail;
     }
 
@@ -315,8 +312,6 @@ static int ijkio_httphook_open(IjkURLContext *h, const char *arg, int flags, Ijk
         av_log(NULL, AV_LOG_INFO, "%s: will reconnect at start\n", __func__);
         ret = ijkio_httphook_reconnect_at(h, 0);
         av_log(NULL, AV_LOG_INFO, "%s: did reconnect at start: %d\n", __func__, ret);
-        if (ret)
-            c->app_io_ctrl.retry_counter++;
     }
 
 fail:
@@ -327,11 +322,15 @@ static int ijkio_httphook_read(IjkURLContext *h, unsigned char *buf, int size)
 {
     Context *c = h->priv_data;
     int ret = 0;
+    int active_reconnect = c->ijkio_app_ctx->active_reconnect;
 
     c->app_io_ctrl.retry_counter = 0;
 
-    ret = ijkio_urlhook_read(h, buf, size);
-    while (ret < 0 && c->logical_pos < c->logical_size && c->abort_request == 0) {
+    if (active_reconnect == 0) {
+        ret = ijkio_urlhook_read(h, buf, size);
+    }
+
+    while ((active_reconnect || ret < 0) && c->logical_pos < c->logical_size && c->abort_request == 0) {
         switch (ret) {
             case IJKAVERROR_EXIT:
                 goto fail;
@@ -339,6 +338,7 @@ static int ijkio_httphook_read(IjkURLContext *h, unsigned char *buf, int size)
 
         c->app_io_ctrl.retry_counter++;
         ret = ijkio_urlhook_call_inject(h);
+        c->ijkio_app_ctx->active_reconnect = active_reconnect = 0;
         if (ret)
             goto fail;
 
