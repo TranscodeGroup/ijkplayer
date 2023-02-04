@@ -1,5 +1,14 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
-
+apply plugin: 'idea'
+idea {
+    module {
+//        excludeDirs += file('../../ijkmedia')
+        excludeDirs += file('ijkplayer-armv7a')
+        excludeDirs += file('ijkplayer-armv5')
+        excludeDirs += file('ijkplayer-x86')
+        excludeDirs += file('ijkplayer-x86_64')
+    }
+}
 buildscript {
     repositories {
         mavenCentral()
