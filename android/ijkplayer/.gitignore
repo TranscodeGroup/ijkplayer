@@ -7,3 +7,4 @@
 /captures
 android-ndk-prof
 .externalNativeBuild/
+.cxx/
