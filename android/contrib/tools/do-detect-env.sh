@@ -88,7 +88,9 @@ esac
 
 case "$UNAME_S" in
     Darwin)
-        export IJK_MAKE_FLAG=-j`sysctl -n machdep.cpu.thread_count`
+        # Enabling multi-jobs mode will result in an exception, so it's disabled.
+        # see: https://github.com/bilibili/ijkplayer/issues/5113#issuecomment-1288378800
+        # export IJK_MAKE_FLAG=-j`sysctl -n machdep.cpu.thread_count`
     ;;
     CYGWIN_NT-*)
         IJK_WIN_TEMP="$(cygpath -am /tmp)"
