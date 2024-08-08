@@ -3,7 +3,7 @@ apply plugin: 'maven-publish'
 // Perform `publishReleasePublicationToLocalRepository` to publish aar to `MavenRepository` folder
 // @see https://gist.github.com/Robyer/a6578e60127418b380ca133a1291f017
 group = 'cn.transcodegroup.ijkplayer'
-version = "$VERSION_NAME.17"
+version = "$VERSION_NAME.$VERSION_SUFFIX"
 
 task androidJavadocs(type: Javadoc) {
     failOnError false

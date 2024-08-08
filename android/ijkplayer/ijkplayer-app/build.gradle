@@ -7,7 +7,7 @@ android {
 
     defaultConfig {
         applicationId "cn.transcodegroup.ijkplayerapp"
-        minSdkVersion 14
+        minSdkVersion 21
         targetSdkVersion project.targetSdkVersion
         versionCode 1
         versionName "1.0"
@@ -28,6 +28,7 @@ dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     if (!isModuleAsApp.toBoolean()) {
         compile project(':ijkplayer-view')
+        compile nativeLib('ijkplayer-arm64')
     }
 
     testCompile "junit:junit:4.12"
