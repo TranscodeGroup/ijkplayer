@@ -21,7 +21,7 @@ allprojects {
         google()
         maven { url 'https://plugins.gradle.org/m2' }
         maven { url 'https://maven.aliyun.com/repository/jcenter' }
-        if (!useNativeModule.toBoolean()) {
+        if (perferUseLocalMaven.toBoolean() || isModuleAsApp.toBoolean()) {
             final localMavenRepository = rootProject.file("../../../MavenRepository")
             if (localMavenRepository.exists()) {
                 maven { url localMavenRepository.toURI() }
@@ -41,7 +41,11 @@ ext {
     versionCode = 800800
     versionName = "0.8.8"
 
-    nativeLib = { name -> useNativeModule.toBoolean() ? project(":$name") : "cn.transcodegroup.ijkplayer:$name:$VERSION_NAME.$NATIVE_VERSION_SUFFIX" }
+    ijkplayerLib = { name, forceUseLocalMaven = false ->
+        (perferUseLocalMaven.toBoolean() || forceUseLocalMaven)
+                ? "cn.transcodegroup.ijkplayer:$name:$VERSION_NAME.$LOCALE_MAVEN_VERSION_SUFFIX"
+                : project(":$name")
+    }
 }
 
 wrapper {

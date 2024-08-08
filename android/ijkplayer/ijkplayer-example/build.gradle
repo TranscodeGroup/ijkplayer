@@ -95,18 +95,18 @@ dependencies {
     if (isModuleAsApp.toBoolean()) {
         compile project(':ijkplayer-exo')
 
-        all32Compile nativeLib('ijkplayer-armv5')
-        all32Compile nativeLib('ijkplayer-armv7a')
-        all32Compile nativeLib('ijkplayer-x86')
+        all32Compile ijkplayerLib('ijkplayer-armv5')
+        all32Compile ijkplayerLib('ijkplayer-armv7a')
+        all32Compile ijkplayerLib('ijkplayer-x86')
 
-        all64Compile nativeLib('ijkplayer-armv5')
-        all64Compile nativeLib('ijkplayer-armv7a')
-        all64Compile nativeLib('ijkplayer-arm64')
-        all64Compile nativeLib('ijkplayer-x86')
-        all64Compile nativeLib('ijkplayer-x86_64')
+        all64Compile ijkplayerLib('ijkplayer-armv5')
+        all64Compile ijkplayerLib('ijkplayer-armv7a')
+        all64Compile ijkplayerLib('ijkplayer-arm64')
+        all64Compile ijkplayerLib('ijkplayer-x86')
+        all64Compile ijkplayerLib('ijkplayer-x86_64')
     } else {
-        compile nativeLib('ijkplayer-armv7a')
-        compile nativeLib('ijkplayer-x86')
+        compile ijkplayerLib('ijkplayer-armv7a')
+        compile ijkplayerLib('ijkplayer-x86')
     }
 
     // compile 'tv.danmaku.ijk.media:ijkplayer-java:0.8.8'

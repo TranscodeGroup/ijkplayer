@@ -25,10 +25,8 @@ android {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    if (!isModuleAsApp.toBoolean()) {
-        compile project(':ijkplayer-view')
-        compile nativeLib('ijkplayer-arm64')
-    }
+    compile ijkplayerLib('ijkplayer-view', isModuleAsApp.toBoolean())
+    compile ijkplayerLib('ijkplayer-arm64', isModuleAsApp.toBoolean())
 
     testCompile "junit:junit:4.12"
     androidTestCompile('androidx.test.ext:junit:1.1.1')

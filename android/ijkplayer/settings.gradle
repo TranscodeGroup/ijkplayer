@@ -1,4 +1,4 @@
-if (useNativeModule.toBoolean()) {
+if (!perferUseLocalMaven.toBoolean()) {
     include ':ijkplayer-armv5', ':ijkplayer-x86_64'
     include ':ijkplayer-armv7a'
     include ':ijkplayer-arm64'
@@ -8,10 +8,10 @@ if (useNativeModule.toBoolean()) {
 include ':ijkplayer-java'
 include ':ijkplayer-exo'
 
+include ':ijkplayer-app'
 if (isModuleAsApp.toBoolean()) {
     include ':ijkplayer-example'
 } else {
-    include ':ijkplayer-app'
     include ':ijkplayer-view'
     project(':ijkplayer-view').projectDir = file('ijkplayer-example')
 }
