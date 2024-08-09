@@ -77,7 +77,12 @@ public class GestureHelper {
         mGestureDetector = new GestureDetector(context, new GestureDetector.SimpleOnGestureListener() {
             @Override
             public boolean onDown(MotionEvent e) {
-                return true;
+                if (mRenderView != null && (mZoomEnabled || mOnDoubleTapListener != null)) {
+                    return true;
+                } else {
+                    onSingleTapListener.onSingleTap(null);
+                    return false;
+                }
             }
 
             @Override
