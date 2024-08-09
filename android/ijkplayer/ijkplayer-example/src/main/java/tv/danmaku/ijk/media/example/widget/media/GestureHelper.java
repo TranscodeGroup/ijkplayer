@@ -11,6 +11,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 public class GestureHelper {
@@ -38,7 +39,7 @@ public class GestureHelper {
     private final Matrix mMatrix = new Matrix();
     private float mScale = 1.0f;
     private float mBeginScale = 1.0f;
-    private boolean mEnabled = true;
+    private boolean mZoomEnabled = true;
 
     /*package*/ GestureHelper(ViewGroup parent, final OnSingleTapListener onSingleTapListener) {
         Context context = parent.getContext();
@@ -56,6 +57,9 @@ public class GestureHelper {
 
             @Override
             public boolean onScale(ScaleGestureDetector detector) {
+                if (mRenderView == null || !mZoomEnabled) {
+                    return false;
+                }
                 float finalScale = Math.max(1.0f, mBeginScale * detector.getScaleFactor());
                 float deltaScale = finalScale / mScale;
 
@@ -96,7 +100,7 @@ public class GestureHelper {
 
             @Override
             public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
-                if (e2.getPointerCount() != 1) {
+                if (mRenderView == null || !mZoomEnabled || e2.getPointerCount() != 1) {
                     return false;
                 }
                 mMatrix.postTranslate(-distanceX, -distanceY);
@@ -114,8 +118,12 @@ public class GestureHelper {
         }
     }
 
-    public void setEnabled(boolean enabled) {
-        mEnabled = enabled;
+    public void setZoomEnabled(boolean enabled) {
+        mZoomEnabled = enabled;
+    }
+
+    public boolean isZoomEnabled() {
+        return mZoomEnabled;
     }
 
     public void setOnScaleChangedListener(OnScaleChangedListener listener) {
@@ -127,12 +135,15 @@ public class GestureHelper {
     }
 
     /*package*/ boolean onTouch(MotionEvent event) {
-        if (!mEnabled || mRenderView == null) {
+        if (mRenderView == null) {
             return false;
         }
-        boolean handled;
-        handled = mGestureDetector.onTouchEvent(event);
-        return mScaleGestureDetector.onTouchEvent(event) || handled;
+        boolean handled = mGestureDetector.onTouchEvent(event);
+        boolean scaleHandled = false;
+        if (mZoomEnabled) {
+            scaleHandled = mScaleGestureDetector.onTouchEvent(event);
+        }
+        return scaleHandled || handled;
     }
 
     /*package*/ void setRenderView(final View renderView) {
@@ -149,17 +160,19 @@ public class GestureHelper {
         }
     }
 
-    private void applyMatrix(View view) {
+    private void applyMatrix(@NonNull View view) {
         getMappedRectF(view, mTempRectF);
         float widthDiff = mParent.getWidth() - mTempRectF.width();
         float heightDiff = mParent.getHeight() - mTempRectF.height();
         float adjustedLeft =
-                widthDiff > 0 ?
-                clamp(mTempRectF.left, 0, widthDiff) :
-                clamp(mTempRectF.left, widthDiff, 0);
+                widthDiff > 0
+                // when view is smaller than parent, make sure view is centered
+                ? widthDiff / 2
+                // when view is bigger than parent, make sure view is not outside parent
+                : clamp(mTempRectF.left, widthDiff, 0);
         float adjustedTop =
                 heightDiff > 0
-                ? clamp(mTempRectF.top, 0, heightDiff)
+                ? heightDiff / 2
                 : clamp(mTempRectF.top, heightDiff, 0);
         mMatrix.postTranslate(adjustedLeft - mTempRectF.left, adjustedTop - mTempRectF.top);
         view.setAnimationMatrix(mMatrix);
