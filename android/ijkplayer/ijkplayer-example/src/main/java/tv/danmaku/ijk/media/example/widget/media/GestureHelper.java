@@ -33,6 +33,7 @@ public class GestureHelper {
     private final ViewGroup mParent;
     private @Nullable View mRenderView;
     private OnScaleChangedListener mOnScaleChangedListener;
+    private GestureDetector.OnDoubleTapListener mOnDoubleTapListener;
     private final RectF mTempRectF = new RectF();
     private final Matrix mMatrix = new Matrix();
     private float mScale = 1.0f;
@@ -77,7 +78,20 @@ public class GestureHelper {
 
             @Override
             public boolean onSingleTapConfirmed(MotionEvent e) {
+                if (mOnDoubleTapListener != null && mOnDoubleTapListener.onSingleTapConfirmed(e)) {
+                    return true;
+                }
                 return onSingleTapListener.onSingleTap(e);
+            }
+
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                return mOnDoubleTapListener != null && mOnDoubleTapListener.onDoubleTap(e);
+            }
+
+            @Override
+            public boolean onDoubleTapEvent(MotionEvent e) {
+                return mOnDoubleTapListener != null && mOnDoubleTapListener.onDoubleTapEvent(e);
             }
 
             @Override
@@ -106,6 +120,10 @@ public class GestureHelper {
 
     public void setOnScaleChangedListener(OnScaleChangedListener listener) {
         mOnScaleChangedListener = listener;
+    }
+
+    public void setOnDoubleTapListener(GestureDetector.OnDoubleTapListener listener) {
+        mOnDoubleTapListener = listener;
     }
 
     /*package*/ boolean onTouch(MotionEvent event) {
