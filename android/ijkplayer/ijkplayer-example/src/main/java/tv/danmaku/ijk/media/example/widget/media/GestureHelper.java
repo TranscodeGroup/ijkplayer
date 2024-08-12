@@ -40,6 +40,8 @@ public class GestureHelper {
     private float mScale = 1.0f;
     private float mBeginScale = 1.0f;
     private boolean mZoomEnabled = true;
+    private float mMinZoom = 1.0f;
+    private float mMaxZoom = 8.0f;
 
     /*package*/ GestureHelper(ViewGroup parent, final OnSingleTapListener onSingleTapListener) {
         Context context = parent.getContext();
@@ -60,7 +62,7 @@ public class GestureHelper {
                 if (mRenderView == null || !mZoomEnabled) {
                     return false;
                 }
-                float finalScale = Math.max(1.0f, mBeginScale * detector.getScaleFactor());
+                float finalScale = clamp(mBeginScale * detector.getScaleFactor(), mMinZoom, mMaxZoom);
                 float deltaScale = finalScale / mScale;
 
                 if (mScale != finalScale) {
@@ -129,6 +131,14 @@ public class GestureHelper {
 
     public boolean isZoomEnabled() {
         return mZoomEnabled;
+    }
+
+    public void setMinZoom(float minZoom) {
+        mMinZoom = minZoom;
+    }
+
+    public void setMaxZoom(float maxZoom) {
+        mMaxZoom = maxZoom;
     }
 
     public void setOnScaleChangedListener(OnScaleChangedListener listener) {
