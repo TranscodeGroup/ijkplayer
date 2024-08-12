@@ -37,6 +37,7 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.TextureView;
 import android.view.View;
+import android.view.animation.Transformation;
 import android.widget.FrameLayout;
 import android.widget.MediaController;
 import android.widget.TableLayout;
@@ -62,7 +63,7 @@ import tv.danmaku.ijk.media.player.misc.IMediaFormat;
 import tv.danmaku.ijk.media.player.misc.ITrackInfo;
 import tv.danmaku.ijk.media.player.misc.IjkMediaFormat;
 
-public class IjkVideoView extends FrameLayout implements MediaController.MediaPlayerControl {
+public class IjkVideoView extends FrameLayout implements MediaController.MediaPlayerControl, GestureHelper.OnSingleTapListener {
     private static String TAG = "IjkVideoView";
     private static String TAG_TG = TAG + "-tgtrack";
     // settable by the client
@@ -117,6 +118,7 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
 
     private Context mAppContext;
     private Settings mSettings;
+    private GestureHelper mGestureHelper;
     private IRenderView mRenderView;
     private int mVideoSarNum;
     private int mVideoSarDen;
@@ -160,7 +162,10 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
     private void initVideoView(Context context) {
         mAppContext = context.getApplicationContext();
         mSettings = new Settings(mAppContext);
-
+        mGestureHelper = new GestureHelper(this, this);
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            setStaticTransformationsEnabled(true);
+        }
         initBackground();
         initRenders();
 
@@ -185,6 +190,11 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         addView(subtitleDisplay, layoutParams_txt);
     }
 
+    @Override
+    protected boolean getChildStaticTransformation(View child, Transformation t) {
+        return mGestureHelper.getChildStaticTransformation(child, t);
+    }
+
     public void setRenderView(IRenderView renderView) {
         if (mRenderView != null) {
             if (mMediaPlayer != null)
@@ -196,8 +206,10 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
             removeView(renderUIView);
         }
 
-        if (renderView == null)
+        if (renderView == null) {
+            mGestureHelper.setRenderView(null);
             return;
+        }
 
         mRenderView = renderView;
         renderView.setAspectRatio(mCurrentAspectRatio);
@@ -214,6 +226,7 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         renderUIView.setLayoutParams(lp);
         addView(renderUIView);
 
+        mGestureHelper.setRenderView(renderUIView);
         mRenderView.addRenderCallback(mSHCallback);
         mRenderView.setVideoRotation(mVideoRotationDegree);
     }
@@ -741,10 +754,20 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         }
     }
 
+    public GestureHelper getGestureHelper() {
+        return mGestureHelper;
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
+        return mGestureHelper.onTouch(ev) || super.onTouchEvent(ev);
+    }
+
+    @Override
+    public boolean onSingleTap(MotionEvent ev) {
         if (isInPlaybackState() && mMediaController != null) {
             toggleMediaControlsVisiblity();
+            return true;
         }
         return false;
     }

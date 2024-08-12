@@ -6,6 +6,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
@@ -30,6 +31,12 @@ public class MainActivity extends AppCompatActivity {
         layout.setId(R.id.fragmentContainer);
         rootLayout.addView(videoView);
         rootLayout.addView(layout);
+        rootLayout.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Log.d(TAG, "onClick() called with: v = [" + v + "]");
+            }
+        });
         setContentView(rootLayout);
 
         if (savedInstanceState == null) {
