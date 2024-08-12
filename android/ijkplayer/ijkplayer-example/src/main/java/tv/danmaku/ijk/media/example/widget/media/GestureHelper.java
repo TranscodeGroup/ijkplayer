@@ -67,12 +67,7 @@ public class GestureHelper {
                 float finalScale = clamp(mBeginScale * detector.getScaleFactor(), mMinZoom, mMaxZoom);
                 float deltaScale = finalScale / mScale;
 
-                if (mScale != finalScale) {
-                    mScale = finalScale;
-                    if (mOnScaleChangedListener != null) {
-                        mOnScaleChangedListener.onScaleChanged(finalScale);
-                    }
-                }
+                setScale(finalScale);
                 mMatrix.postScale(deltaScale, deltaScale, detector.getFocusX(), detector.getFocusY());
                 applyMatrix(mRenderView);
                 return false;
@@ -121,10 +116,23 @@ public class GestureHelper {
 
     public void reset() {
         mMatrix.reset();
-        mScale = 1.0f;
+        setScale(1.0f);
         if (mRenderView != null) {
             setAnimationMatrixCompat(mRenderView, mMatrix);
         }
+    }
+
+    void setScale(float scale) {
+        if (mScale != scale) {
+            mScale = scale;
+            if (mOnScaleChangedListener != null) {
+                mOnScaleChangedListener.onScaleChanged(scale);
+            }
+        }
+    }
+
+    public float getZoom() {
+        return mScale;
     }
 
     public void setZoomEnabled(boolean enabled) {
@@ -213,7 +221,7 @@ public class GestureHelper {
      * @see ViewGroup#getChildStaticTransformation(View, Transformation)
      */
     /*package*/ boolean getChildStaticTransformation(View child, Transformation t) {
-        if(child == mRenderView){
+        if (child == mRenderView) {
             t.getMatrix().set(mMatrix);
             return true;
         }
