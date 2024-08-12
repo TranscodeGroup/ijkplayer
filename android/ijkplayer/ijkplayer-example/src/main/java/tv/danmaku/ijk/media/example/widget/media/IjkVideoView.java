@@ -37,6 +37,7 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.TextureView;
 import android.view.View;
+import android.view.animation.Transformation;
 import android.widget.FrameLayout;
 import android.widget.MediaController;
 import android.widget.TableLayout;
@@ -162,6 +163,9 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         mAppContext = context.getApplicationContext();
         mSettings = new Settings(mAppContext);
         mGestureHelper = new GestureHelper(this, this);
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            setStaticTransformationsEnabled(true);
+        }
         initBackground();
         initRenders();
 
@@ -184,6 +188,11 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM);
         addView(subtitleDisplay, layoutParams_txt);
+    }
+
+    @Override
+    protected boolean getChildStaticTransformation(View child, Transformation t) {
+        return mGestureHelper.getChildStaticTransformation(child, t);
     }
 
     public void setRenderView(IRenderView renderView) {

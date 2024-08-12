@@ -4,12 +4,14 @@ import android.content.Context;
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.os.Build;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
+import android.view.animation.Transformation;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -121,7 +123,7 @@ public class GestureHelper {
         mMatrix.reset();
         mScale = 1.0f;
         if (mRenderView != null) {
-            mRenderView.setAnimationMatrix(mMatrix);
+            setAnimationMatrixCompat(mRenderView, mMatrix);
         }
     }
 
@@ -167,7 +169,11 @@ public class GestureHelper {
             ViewTreeObserver.OnGlobalLayoutListener listener = new ViewTreeObserver.OnGlobalLayoutListener() {
                 @Override
                 public void onGlobalLayout() {
-                    renderView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                        renderView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                    } else {
+                        renderView.getViewTreeObserver().removeGlobalOnLayoutListener(this);
+                    }
                     applyMatrix(renderView);
                 }
             };
@@ -190,7 +196,28 @@ public class GestureHelper {
                 ? heightDiff / 2
                 : clamp(mTempRectF.top, heightDiff, 0);
         mMatrix.postTranslate(adjustedLeft - mTempRectF.left, adjustedTop - mTempRectF.top);
-        view.setAnimationMatrix(mMatrix);
+        setAnimationMatrixCompat(view, mMatrix);
+    }
+
+    private static void setAnimationMatrixCompat(View view, Matrix matrix) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            view.setAnimationMatrix(matrix);
+        } else {
+            // use static transformation to apply matrix
+            view.invalidate();
+        }
+    }
+
+    /**
+     * @see <a href="https://stackoverflow.com/a/38363409/3673440">SOF</a>
+     * @see ViewGroup#getChildStaticTransformation(View, Transformation)
+     */
+    /*package*/ boolean getChildStaticTransformation(View child, Transformation t) {
+        if(child == mRenderView){
+            t.getMatrix().set(mMatrix);
+            return true;
+        }
+        return false;
     }
 
     /** @see View#getHitRect(Rect) */
