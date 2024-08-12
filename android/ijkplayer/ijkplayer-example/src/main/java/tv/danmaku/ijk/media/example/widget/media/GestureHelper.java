@@ -19,8 +19,12 @@ import androidx.annotation.Nullable;
 public class GestureHelper {
     private static final String TAG = "GestureHelper";
 
-    public interface OnScaleChangedListener {
+    public interface OnScaleListener {
         void onScaleChanged(float scale);
+
+        void onScaleBegin();
+
+        void onScaleEnd();
     }
 
     interface OnSingleTapListener {
@@ -35,7 +39,7 @@ public class GestureHelper {
     private final GestureDetector mGestureDetector;
     private final ViewGroup mParent;
     private @Nullable View mRenderView;
-    private OnScaleChangedListener mOnScaleChangedListener;
+    private OnScaleListener mOnScaleListener;
     private GestureDetector.OnDoubleTapListener mOnDoubleTapListener;
     private final RectF mTempRectF = new RectF();
     private final Matrix mMatrix = new Matrix();
@@ -52,11 +56,17 @@ public class GestureHelper {
             @Override
             public boolean onScaleBegin(ScaleGestureDetector detector) {
                 mBeginScale = mScale;
+                if (mOnScaleListener != null) {
+                    mOnScaleListener.onScaleBegin();
+                }
                 return true;
             }
 
             @Override
             public void onScaleEnd(ScaleGestureDetector detector) {
+                if (mOnScaleListener != null) {
+                    mOnScaleListener.onScaleEnd();
+                }
             }
 
             @Override
@@ -125,8 +135,8 @@ public class GestureHelper {
     void setScale(float scale) {
         if (mScale != scale) {
             mScale = scale;
-            if (mOnScaleChangedListener != null) {
-                mOnScaleChangedListener.onScaleChanged(scale);
+            if (mOnScaleListener != null) {
+                mOnScaleListener.onScaleChanged(scale);
             }
         }
     }
@@ -151,8 +161,8 @@ public class GestureHelper {
         mMaxZoom = maxZoom;
     }
 
-    public void setOnScaleChangedListener(OnScaleChangedListener listener) {
-        mOnScaleChangedListener = listener;
+    public void setOnScaleListener(OnScaleListener listener) {
+        mOnScaleListener = listener;
     }
 
     public void setOnDoubleTapListener(GestureDetector.OnDoubleTapListener listener) {
