@@ -124,7 +124,7 @@ public class GestureHelper {
         });
     }
 
-    public void reset() {
+    public void resetZoom() {
         mMatrix.reset();
         setScale(1.0f);
         if (mRenderView != null) {
