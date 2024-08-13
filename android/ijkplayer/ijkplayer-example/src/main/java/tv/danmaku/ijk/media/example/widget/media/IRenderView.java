@@ -17,12 +17,15 @@
 
 package tv.danmaku.ijk.media.example.widget.media;
 
+import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.animation.Transformation;
 
 import tv.danmaku.ijk.media.player.IMediaPlayer;
 
@@ -35,6 +38,17 @@ public interface IRenderView {
     int AR_4_3_FIT_PARENT = 5;
 
     View getView();
+
+    void setMatrix(Matrix matrix);
+
+    /**
+     * Get the static transformation matrix.
+     * @return If not use static transformation to apply matrix to the view, please return null.
+     *
+     * @see <a href="https://stackoverflow.com/a/38363409/3673440">SOF</a>
+     * @see ViewGroup#getChildStaticTransformation(View, Transformation)
+     */
+    @Nullable Matrix getStaticMatrix();
 
     boolean shouldWaitForResize();
 

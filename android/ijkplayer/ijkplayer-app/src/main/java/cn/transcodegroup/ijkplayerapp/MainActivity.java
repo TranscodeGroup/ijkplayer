@@ -7,6 +7,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
@@ -29,8 +30,8 @@ public class MainActivity extends AppCompatActivity {
         FrameLayout layout = new FrameLayout(this);
         IjkVideoView videoView = new IjkVideoView(this);
         layout.setId(R.id.fragmentContainer);
-        rootLayout.addView(videoView);
-        rootLayout.addView(layout);
+        rootLayout.addView(videoView, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 2));
+        rootLayout.addView(layout, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         rootLayout.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -45,6 +46,8 @@ public class MainActivity extends AppCompatActivity {
                     .commit();
         }
 
+        videoView.setBackgroundColor(0x11ff0000);
+        videoView.getGestureHelper().setMinZoom(0.5f);
         // videoView.setVideoPath("http://192.240.127.34:1935/live/cs19.stream/play.m3u8"); // yuvj420p
         videoView.setVideoPath("http://devimages.apple.com.edgekey.net/streaming/examples/bipbop_4x3/gear1/prog_index.m3u8"); // yuv420p
         videoView.start();

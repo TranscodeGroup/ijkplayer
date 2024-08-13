@@ -19,6 +19,7 @@ package tv.danmaku.ijk.media.example.widget.media;
 
 import android.annotation.TargetApi;
 import android.content.Context;
+import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.os.Build;
 import androidx.annotation.NonNull;
@@ -41,6 +42,7 @@ import tv.danmaku.ijk.media.player.ISurfaceTextureHolder;
 
 public class SurfaceRenderView extends SurfaceView implements IRenderView {
     private MeasureHelper mMeasureHelper;
+    private  Matrix mStaticMatrix;
 
     public SurfaceRenderView(Context context) {
         super(context);
@@ -74,6 +76,24 @@ public class SurfaceRenderView extends SurfaceView implements IRenderView {
     @Override
     public View getView() {
         return this;
+    }
+
+    @Override
+    public void setMatrix(Matrix matrix) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            setAnimationMatrix(matrix);
+        } else {
+            mStaticMatrix = matrix;
+            invalidate();
+        }
+    }
+
+    @Override
+    public Matrix getStaticMatrix() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+           return null;
+        }
+        return mStaticMatrix;
     }
 
     @Override

@@ -5,9 +5,11 @@ import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.Build;
+import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
+import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
@@ -38,7 +40,7 @@ public class GestureHelper {
     private final ScaleGestureDetector mScaleGestureDetector;
     private final GestureDetector mGestureDetector;
     private final ViewGroup mParent;
-    private @Nullable View mRenderView;
+    private @Nullable IRenderView mRenderView;
     private OnScaleListener mOnScaleListener;
     private GestureDetector.OnDoubleTapListener mOnDoubleTapListener;
     private final RectF mTempRectF = new RectF();
@@ -128,7 +130,7 @@ public class GestureHelper {
         mMatrix.reset();
         setScale(1.0f);
         if (mRenderView != null) {
-            setAnimationMatrixCompat(mRenderView, mMatrix);
+            mRenderView.setMatrix(mMatrix);
         }
     }
 
@@ -181,26 +183,27 @@ public class GestureHelper {
         return scaleHandled || handled;
     }
 
-    /*package*/ void setRenderView(final View renderView) {
+    /*package*/ void setRenderView(final IRenderView renderView) {
         mRenderView = renderView;
         if (renderView != null) {
+            final View view = renderView.getView();
             ViewTreeObserver.OnGlobalLayoutListener listener = new ViewTreeObserver.OnGlobalLayoutListener() {
                 @Override
                 public void onGlobalLayout() {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                        renderView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                        view.getViewTreeObserver().removeOnGlobalLayoutListener(this);
                     } else {
-                        renderView.getViewTreeObserver().removeGlobalOnLayoutListener(this);
+                        view.getViewTreeObserver().removeGlobalOnLayoutListener(this);
                     }
                     applyMatrix(renderView);
                 }
             };
-            renderView.getViewTreeObserver().addOnGlobalLayoutListener(listener);
+            view.getViewTreeObserver().addOnGlobalLayoutListener(listener);
         }
     }
 
-    private void applyMatrix(@NonNull View view) {
-        getMappedRectF(view, mTempRectF);
+    private void applyMatrix(@NonNull IRenderView renderView) {
+        getMappedRectF(renderView.getView(), mTempRectF);
         float widthDiff = mParent.getWidth() - mTempRectF.width();
         float heightDiff = mParent.getHeight() - mTempRectF.height();
         float adjustedLeft =
@@ -214,28 +217,7 @@ public class GestureHelper {
                 ? heightDiff / 2
                 : clamp(mTempRectF.top, heightDiff, 0);
         mMatrix.postTranslate(adjustedLeft - mTempRectF.left, adjustedTop - mTempRectF.top);
-        setAnimationMatrixCompat(view, mMatrix);
-    }
-
-    private static void setAnimationMatrixCompat(View view, Matrix matrix) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            view.setAnimationMatrix(matrix);
-        } else {
-            // use static transformation to apply matrix
-            view.invalidate();
-        }
-    }
-
-    /**
-     * @see <a href="https://stackoverflow.com/a/38363409/3673440">SOF</a>
-     * @see ViewGroup#getChildStaticTransformation(View, Transformation)
-     */
-    /*package*/ boolean getChildStaticTransformation(View child, Transformation t) {
-        if (child == mRenderView) {
-            t.getMatrix().set(mMatrix);
-            return true;
-        }
-        return false;
+        renderView.setMatrix(mMatrix);
     }
 
     /** @see View#getHitRect(Rect) */

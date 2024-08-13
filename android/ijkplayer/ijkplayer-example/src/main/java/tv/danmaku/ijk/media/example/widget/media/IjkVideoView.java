@@ -192,7 +192,11 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
 
     @Override
     protected boolean getChildStaticTransformation(View child, Transformation t) {
-        return mGestureHelper.getChildStaticTransformation(child, t);
+        if(mRenderView != null && mRenderView.getView() == child && mRenderView.getStaticMatrix() != null){
+            t.getMatrix().set(mRenderView.getStaticMatrix());
+            return true;
+        }
+        return false;
     }
 
     public void setRenderView(IRenderView renderView) {
@@ -226,7 +230,7 @@ public class IjkVideoView extends FrameLayout implements MediaController.MediaPl
         renderUIView.setLayoutParams(lp);
         addView(renderUIView);
 
-        mGestureHelper.setRenderView(renderUIView);
+        mGestureHelper.setRenderView(mRenderView);
         mRenderView.addRenderCallback(mSHCallback);
         mRenderView.setVideoRotation(mVideoRotationDegree);
     }

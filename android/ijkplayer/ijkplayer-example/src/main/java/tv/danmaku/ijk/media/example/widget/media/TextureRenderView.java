@@ -19,6 +19,7 @@ package tv.danmaku.ijk.media.example.widget.media;
 
 import android.annotation.TargetApi;
 import android.content.Context;
+import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.os.Build;
 import androidx.annotation.NonNull;
@@ -29,6 +30,7 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.TextureView;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
@@ -78,12 +80,29 @@ public class TextureRenderView extends TextureView implements IRenderView {
     }
 
     @Override
+    public void setMatrix(Matrix matrix) {
+        setTransform(matrix);
+    }
+
+    @Override
+    public Matrix getStaticMatrix() {
+        return null;
+    }
+
+    @Override
     public boolean shouldWaitForResize() {
         return false;
     }
 
     @Override
+    protected void onAttachedToWindow() {
+        ((ViewGroup) getParent()).setClipChildren(false);
+        super.onAttachedToWindow();
+    }
+
+    @Override
     protected void onDetachedFromWindow() {
+        ((ViewGroup) getParent()).setClipChildren(true);
         mSurfaceCallback.willDetachFromWindow();
         super.onDetachedFromWindow();
         mSurfaceCallback.didDetachFromWindow();
